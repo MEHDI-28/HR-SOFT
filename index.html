@@ -44,21 +44,100 @@
 
     <!-- Tab: Settings & Definitions -->
     <section id="panel-fields" class="tab-panel">
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 class="text-lg font-semibold">تنظیمات و تعاریف فیلدها</h2>
-            <p class="text-sm text-slate-500">هر فیلد دارای <strong>شناسه</strong>، <strong>عنوان</strong> و <strong>توضیحات</strong> جداگانه است. شناسه برای سیستم و عنوان برای نمایش استفاده می‌شود.</p>
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-lg font-semibold">تنظیمات و تعاریف فیلدها</h2>
+          <p class="text-sm text-slate-500">روی هر فیلد کلیک کنید تا جزئیات، تاریخچه و امکان ویرایش را ببینید.</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="resetFieldsToDefault()" class="px-3 py-1.5 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">بازنشانی به پیش‌فرض</button>
+          <button onclick="startAddField()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ فیلد جدید</button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-4">
+        <!-- Field list (names only) -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+            <h3 class="text-sm font-semibold text-slate-700">فهرست فیلدها</h3>
+            <p class="text-xs text-slate-500 mt-0.5" id="fields-count-label">۰ فیلد</p>
           </div>
-          <div class="flex gap-2">
-            <button onclick="resetFieldsToDefault()" class="px-3 py-1.5 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">بازنشانی به پیش‌فرض</button>
-            <button onclick="addCustomField()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ فیلد سفارشی</button>
+          <div id="fields-nav-list" class="max-h-[70vh] overflow-y-auto divide-y divide-slate-100"></div>
+        </div>
+
+        <!-- Field detail / edit / history -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 min-h-[420px]">
+          <div id="field-detail-empty" class="flex items-center justify-center h-full min-h-[420px] text-slate-400 text-sm p-8 text-center">
+            یک فیلد را از فهرست سمت راست انتخاب کنید یا «فیلد جدید» را بزنید.
+          </div>
+          <div id="field-detail-panel" class="hidden p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 class="text-lg font-semibold" id="fd-heading">—</h3>
+                <p class="text-xs text-slate-500 mt-0.5 font-mono" id="fd-key-badge">—</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" id="fd-btn-edit" onclick="enterFieldEditMode()" class="px-3 py-1.5 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">ویرایش</button>
+                <button type="button" id="fd-btn-delete" onclick="removeSelectedField()" class="px-3 py-1.5 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50 hidden">حذف</button>
+              </div>
+            </div>
+
+            <!-- View mode -->
+            <div id="fd-view-mode" class="space-y-4">
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                  <div class="text-xs text-slate-500 mb-1">شناسه</div>
+                  <div class="font-mono text-sm" id="fd-view-key">—</div>
+                </div>
+                <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                  <div class="text-xs text-slate-500 mb-1">عنوان</div>
+                  <div class="text-sm font-medium" id="fd-view-label">—</div>
+                </div>
+              </div>
+              <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                <div class="text-xs text-slate-500 mb-1">توضیحات</div>
+                <div class="text-sm text-slate-700 whitespace-pre-wrap" id="fd-view-desc">—</div>
+              </div>
+              <div class="border border-slate-100 rounded-lg p-3 bg-slate-50/50">
+                <div class="text-xs text-slate-500 mb-1">منبع اکسل</div>
+                <div class="text-sm text-slate-600" id="fd-view-source">—</div>
+              </div>
+            </div>
+
+            <!-- Edit mode -->
+            <div id="fd-edit-mode" class="hidden space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">شناسه (ID)</label>
+                <input type="text" id="fd-edit-key" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" dir="ltr" />
+                <p class="text-[10px] text-slate-400 mt-0.5" id="fd-key-hint">برای فیلدهای سیستمی قابل تغییر نیست</p>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">عنوان</label>
+                <input type="text" id="fd-edit-label" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">توضیحات</label>
+                <textarea id="fd-edit-desc" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <button type="button" onclick="saveFieldEdit()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">ذخیره</button>
+                <button type="button" onclick="cancelFieldEdit()" class="px-4 py-2 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">انصراف</button>
+              </div>
+            </div>
+
+            <!-- History -->
+            <div class="mt-6 pt-4 border-t border-slate-200">
+              <h4 class="text-sm font-semibold text-slate-700 mb-2">تاریخچه تغییرات</h4>
+              <div id="fd-history" class="space-y-2 max-h-48 overflow-y-auto text-sm">
+                <p class="text-slate-400 text-xs">هنوز تغییری ثبت نشده است.</p>
+              </div>
+            </div>
           </div>
         </div>
-        <div id="fields-list" class="grid gap-4 md:grid-cols-2"></div>
       </div>
-      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
-        <strong>نکته:</strong> فیلدهای کلیدی درخت: شناسه <code class="bg-amber-100 px-1 rounded">id</code> (شماره سمت) و <code class="bg-amber-100 px-1 rounded">parentId</code> (سمت بالاتر). شناسه را فقط در صورت نیاز تغییر دهید.
+
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 mt-4">
+        <strong>نکته:</strong> فیلدهای کلیدی درخت: شناسه <code class="bg-amber-100 px-1 rounded">id</code> و <code class="bg-amber-100 px-1 rounded">parentId</code>. با کلیک روی هر فیلد می‌توانید ویرایش و تاریخچه را ببینید.
       </div>
     </section>
 
@@ -336,7 +415,31 @@
       if (name === "export") updateStatus();
     }
 
-    // ========== Fields / Settings & Definitions ==========
+    // ========== Fields / Settings & Definitions (list + detail + history) ==========
+    let selectedFieldIndex = -1;   // -1 = none, -2 = new field mode
+    let fieldHistory = {};         // key -> [{ at, action, changes: [{field, from, to}] }]
+
+    try {
+      fieldHistory = JSON.parse(localStorage.getItem("org_field_history") || "{}") || {};
+    } catch { fieldHistory = {}; }
+
+    function saveFieldHistory() {
+      localStorage.setItem("org_field_history", JSON.stringify(fieldHistory));
+    }
+
+    function pushFieldHistory(fieldKey, action, changes) {
+      if (!fieldKey) return;
+      if (!fieldHistory[fieldKey]) fieldHistory[fieldKey] = [];
+      fieldHistory[fieldKey].unshift({
+        at: new Date().toISOString(),
+        action: action || "ویرایش",
+        changes: changes || []
+      });
+      // keep last 50 per field
+      if (fieldHistory[fieldKey].length > 50) fieldHistory[fieldKey].length = 50;
+      saveFieldHistory();
+    }
+
     function ensureFields() {
       if (!Array.isArray(fields) || fields.length === 0) {
         fields = structuredClone(defaultFields);
@@ -344,112 +447,266 @@
       }
     }
 
+    function isCoreField(f) {
+      return !!defaultFields.find(d => d.key === f.key);
+    }
+
     function renderFields() {
       ensureFields();
-      const container = document.getElementById("fields-list");
-      if (!container) return;
+      const nav = document.getElementById("fields-nav-list");
+      const countLabel = document.getElementById("fields-count-label");
+      if (!nav) return;
+
+      if (countLabel) countLabel.textContent = fields.length + " فیلد";
 
       if (!fields.length) {
-        container.innerHTML = `<div class="col-span-2 text-center text-slate-400 py-10">هیچ فیلدی تعریف نشده. روی «بازنشانی به پیش‌فرض» کلیک کنید.</div>`;
+        nav.innerHTML = `<div class="p-4 text-center text-slate-400 text-sm">فیلدی نیست. «فیلد جدید» یا بازنشانی را بزنید.</div>`;
+        showFieldEmpty();
         return;
       }
 
-      container.innerHTML = fields.map((f, i) => {
-        const isCore = !!defaultFields.find(d => d.key === f.key);
+      nav.innerHTML = fields.map((f, i) => {
+        const active = i === selectedFieldIndex;
+        const core = isCoreField(f);
         return `
-        <div class="field-card border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-xs font-medium text-slate-500">فیلد ${i + 1}${f.required ? ' · <span class="text-red-600">الزامی</span>' : ''}</span>
-            ${!isCore ? `<button type="button" onclick="removeField(${i})" class="text-xs text-red-500 hover:text-red-700 hover:underline">حذف فیلد</button>` : `<span class="text-[10px] text-slate-400">سیستمی</span>`}
-          </div>
+          <button type="button"
+            onclick="selectField(${i})"
+            class="w-full text-right px-4 py-3 hover:bg-blue-50 transition ${active ? 'bg-blue-50 border-r-4 border-blue-600' : ''}">
+            <div class="font-medium text-sm text-slate-800 truncate">${escapeHtml(f.label || f.key)}</div>
+            <div class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(f.key)}${core ? ' · سیستمی' : ''}${f.required ? ' · الزامی' : ''}</div>
+          </button>`;
+      }).join("");
 
-          <!-- شناسه -->
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">شناسه (ID)</label>
-            <input type="text"
-              value="${escapeHtml(f.key)}"
-              ${isCore ? 'readonly' : ''}
-              onchange="updateFieldKey(${i}, this.value)"
-              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono ${isCore ? 'bg-slate-50 text-slate-500' : 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}"
-              dir="ltr"
-              placeholder="مثلاً customNote" />
-            <p class="text-[10px] text-slate-400 mt-0.5">شناسه یکتا برای سیستم — برای فیلدهای اصلی قابل تغییر نیست</p>
-          </div>
-
-          <!-- عنوان -->
-          <div class="mb-3">
-            <label class="block text-xs font-medium text-slate-600 mb-1">عنوان</label>
-            <input type="text"
-              value="${escapeHtml(f.label || '')}"
-              onchange="fields[${i}].label = this.value; save();"
-              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="عنوان نمایشی فیلد" />
-          </div>
-
-          <!-- توضیحات -->
-          <div class="mb-1">
-            <label class="block text-xs font-medium text-slate-600 mb-1">توضیحات</label>
-            <textarea rows="2"
-              onchange="fields[${i}].desc = this.value; save();"
-              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-              placeholder="توضیح کوتاه درباره کاربرد این فیلد">${escapeHtml(f.desc || '')}</textarea>
-          </div>
-
-          ${f.source ? `<div class="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100">منبع اکسل: ${escapeHtml(f.source)}</div>` : ''}
-        </div>
-        `;
-      }).join('');
+      // Keep detail in sync
+      if (selectedFieldIndex >= 0 && selectedFieldIndex < fields.length) {
+        showFieldDetail(selectedFieldIndex, false);
+      } else if (selectedFieldIndex === -2) {
+        // stay in add mode
+      } else {
+        showFieldEmpty();
+      }
     }
 
-    function updateFieldKey(index, newKey) {
-      newKey = (newKey || '').trim();
-      if (!newKey) {
-        alert('شناسه نمی‌تواند خالی باشد.');
-        renderFields();
-        return;
-      }
-      if (fields.some((f, i) => i !== index && f.key === newKey)) {
-        alert('این شناسه قبلاً استفاده شده است.');
-        renderFields();
-        return;
-      }
-      fields[index].key = newKey;
-      save();
+    function showFieldEmpty() {
+      const empty = document.getElementById("field-detail-empty");
+      const panel = document.getElementById("field-detail-panel");
+      if (empty) empty.classList.remove("hidden");
+      if (panel) panel.classList.add("hidden");
     }
 
-    function removeField(index) {
-      if (!confirm('این فیلد سفارشی حذف شود؟')) return;
-      fields.splice(index, 1);
+    function selectField(index) {
+      selectedFieldIndex = index;
+      renderFields(); // refresh active state in list
+      showFieldDetail(index, false);
+    }
+
+    function showFieldDetail(index, editMode) {
+      const f = fields[index];
+      if (!f) { showFieldEmpty(); return; }
+
+      document.getElementById("field-detail-empty").classList.add("hidden");
+      document.getElementById("field-detail-panel").classList.remove("hidden");
+
+      const core = isCoreField(f);
+      document.getElementById("fd-heading").textContent = f.label || f.key;
+      document.getElementById("fd-key-badge").textContent = f.key + (core ? " (سیستمی)" : "");
+      document.getElementById("fd-view-key").textContent = f.key || "—";
+      document.getElementById("fd-view-label").textContent = f.label || "—";
+      document.getElementById("fd-view-desc").textContent = f.desc || "—";
+      document.getElementById("fd-view-source").textContent = f.source || "—";
+
+      const delBtn = document.getElementById("fd-btn-delete");
+      if (delBtn) delBtn.classList.toggle("hidden", core);
+
+      document.getElementById("fd-edit-key").value = f.key || "";
+      document.getElementById("fd-edit-key").readOnly = core;
+      document.getElementById("fd-edit-key").classList.toggle("bg-slate-50", core);
+      document.getElementById("fd-key-hint").textContent = core
+        ? "شناسه فیلدهای سیستمی قابل تغییر نیست"
+        : "شناسه یکتا به انگلیسی (مثلاً customNote)";
+      document.getElementById("fd-edit-label").value = f.label || "";
+      document.getElementById("fd-edit-desc").value = f.desc || "";
+
+      if (editMode) {
+        document.getElementById("fd-view-mode").classList.add("hidden");
+        document.getElementById("fd-edit-mode").classList.remove("hidden");
+        document.getElementById("fd-btn-edit").classList.add("hidden");
+      } else {
+        document.getElementById("fd-view-mode").classList.remove("hidden");
+        document.getElementById("fd-edit-mode").classList.add("hidden");
+        document.getElementById("fd-btn-edit").classList.remove("hidden");
+      }
+
+      renderFieldHistory(f.key);
+    }
+
+    function renderFieldHistory(fieldKey) {
+      const box = document.getElementById("fd-history");
+      if (!box) return;
+      const items = fieldHistory[fieldKey] || [];
+      if (!items.length) {
+        box.innerHTML = `<p class="text-slate-400 text-xs">هنوز تغییری برای این فیلد ثبت نشده است.</p>`;
+        return;
+      }
+      box.innerHTML = items.map(h => {
+        const date = new Date(h.at);
+        const dateStr = isNaN(date.getTime()) ? h.at :
+          date.toLocaleString("fa-IR", { dateStyle: "short", timeStyle: "short" });
+        const changesHtml = (h.changes || []).map(c =>
+          `<div class="text-xs text-slate-600 mr-2">• <span class="font-medium">${escapeHtml(c.field)}</span>:
+            <span class="text-slate-400 line-through">${escapeHtml(String(c.from ?? "—"))}</span>
+            → <span>${escapeHtml(String(c.to ?? "—"))}</span></div>`
+        ).join("");
+        return `
+          <div class="border border-slate-100 rounded-lg p-2.5 bg-slate-50/80">
+            <div class="flex justify-between gap-2 text-xs mb-1">
+              <span class="font-medium text-slate-700">${escapeHtml(h.action)}</span>
+              <span class="text-slate-400">${dateStr}</span>
+            </div>
+            ${changesHtml || `<div class="text-xs text-slate-500">—</div>`}
+          </div>`;
+      }).join("");
+    }
+
+    function enterFieldEditMode() {
+      if (selectedFieldIndex < 0) return;
+      showFieldDetail(selectedFieldIndex, true);
+    }
+
+    function cancelFieldEdit() {
+      if (selectedFieldIndex === -2) {
+        selectedFieldIndex = -1;
+        renderFields();
+        showFieldEmpty();
+        return;
+      }
+      if (selectedFieldIndex >= 0) showFieldDetail(selectedFieldIndex, false);
+    }
+
+    function saveFieldEdit() {
+      const keyInput = (document.getElementById("fd-edit-key").value || "").trim().replace(/\s+/g, "_");
+      const label = (document.getElementById("fd-edit-label").value || "").trim();
+      const desc = (document.getElementById("fd-edit-desc").value || "").trim();
+
+      if (!keyInput) { alert("شناسه الزامی است."); return; }
+      if (!label) { alert("عنوان الزامی است."); return; }
+
+      // New field
+      if (selectedFieldIndex === -2) {
+        if (fields.some(f => f.key === keyInput)) {
+          alert("این شناسه قبلاً استفاده شده است.");
+          return;
+        }
+        const neu = {
+          key: keyInput,
+          label,
+          desc,
+          type: "text",
+          required: false,
+          source: "سفارشی"
+        };
+        fields.push(neu);
+        pushFieldHistory(keyInput, "ایجاد فیلد", [
+          { field: "شناسه", from: "", to: keyInput },
+          { field: "عنوان", from: "", to: label },
+          { field: "توضیحات", from: "", to: desc }
+        ]);
+        save();
+        selectedFieldIndex = fields.length - 1;
+        renderFields();
+        showFieldDetail(selectedFieldIndex, false);
+        return;
+      }
+
+      const idx = selectedFieldIndex;
+      if (idx < 0 || idx >= fields.length) return;
+      const f = fields[idx];
+      const core = isCoreField(f);
+      const oldKey = f.key;
+
+      if (!core && keyInput !== oldKey) {
+        if (fields.some((x, i) => i !== idx && x.key === keyInput)) {
+          alert("این شناسه قبلاً استفاده شده است.");
+          return;
+        }
+      }
+
+      const changes = [];
+      if (!core && keyInput !== f.key) changes.push({ field: "شناسه", from: f.key, to: keyInput });
+      if (label !== (f.label || "")) changes.push({ field: "عنوان", from: f.label || "", to: label });
+      if (desc !== (f.desc || "")) changes.push({ field: "توضیحات", from: f.desc || "", to: desc });
+
+      if (!changes.length) {
+        showFieldDetail(idx, false);
+        return;
+      }
+
+      if (!core) f.key = keyInput;
+      f.label = label;
+      f.desc = desc;
+
+      // If key renamed, move history bucket
+      if (!core && keyInput !== oldKey && fieldHistory[oldKey]) {
+        fieldHistory[keyInput] = (fieldHistory[keyInput] || []).concat(fieldHistory[oldKey]);
+        delete fieldHistory[oldKey];
+        saveFieldHistory();
+      }
+
+      pushFieldHistory(f.key, "ویرایش", changes);
       save();
       renderFields();
+      showFieldDetail(idx, false);
     }
 
-    function addCustomField() {
-      const key = prompt('شناسه انگلیسی فیلد جدید (مثلاً customNote):');
-      if (!key) return;
-      const cleanKey = key.trim().replace(/\s+/g, '_');
-      if (!cleanKey || fields.some(f => f.key === cleanKey)) {
-        alert('شناسه نامعتبر یا تکراری است.');
+    function startAddField() {
+      selectedFieldIndex = -2;
+      document.getElementById("field-detail-empty").classList.add("hidden");
+      document.getElementById("field-detail-panel").classList.remove("hidden");
+      document.getElementById("fd-heading").textContent = "فیلد جدید";
+      document.getElementById("fd-key-badge").textContent = "در حال ایجاد";
+      document.getElementById("fd-view-mode").classList.add("hidden");
+      document.getElementById("fd-edit-mode").classList.remove("hidden");
+      document.getElementById("fd-btn-edit").classList.add("hidden");
+      document.getElementById("fd-btn-delete").classList.add("hidden");
+      document.getElementById("fd-edit-key").value = "";
+      document.getElementById("fd-edit-key").readOnly = false;
+      document.getElementById("fd-edit-key").classList.remove("bg-slate-50");
+      document.getElementById("fd-key-hint").textContent = "شناسه یکتا به انگلیسی (مثلاً customNote)";
+      document.getElementById("fd-edit-label").value = "";
+      document.getElementById("fd-edit-desc").value = "";
+      document.getElementById("fd-history").innerHTML = `<p class="text-slate-400 text-xs">پس از ذخیره، تاریخچه اینجا نمایش داده می‌شود.</p>`;
+      // clear active state in list
+      const nav = document.getElementById("fields-nav-list");
+      if (nav) {
+        nav.querySelectorAll("button").forEach(b => b.classList.remove("bg-blue-50", "border-r-4", "border-blue-600"));
+      }
+    }
+
+    function removeSelectedField() {
+      if (selectedFieldIndex < 0 || selectedFieldIndex >= fields.length) return;
+      const f = fields[selectedFieldIndex];
+      if (isCoreField(f)) {
+        alert("فیلدهای سیستمی قابل حذف نیستند.");
         return;
       }
-      const label = prompt('عنوان نمایشی فیلد:', cleanKey) || cleanKey;
-      fields.push({
-        key: cleanKey,
-        label: label,
-        desc: '',
-        type: 'text',
-        required: false,
-        source: 'سفارشی'
-      });
+      if (!confirm(`فیلد «${f.label || f.key}» حذف شود؟`)) return;
+      pushFieldHistory(f.key, "حذف فیلد", [
+        { field: "عنوان", from: f.label || "", to: "(حذف شد)" }
+      ]);
+      fields.splice(selectedFieldIndex, 1);
+      selectedFieldIndex = -1;
       save();
       renderFields();
+      showFieldEmpty();
     }
 
     function resetFieldsToDefault() {
-      if (!confirm('تمام تغییرات فیلدها به حالت پیش‌فرض برگردانده شود؟')) return;
+      if (!confirm("تمام تغییرات فیلدها به حالت پیش‌فرض برگردانده شود؟")) return;
       fields = structuredClone(defaultFields);
+      selectedFieldIndex = -1;
       save();
       renderFields();
+      showFieldEmpty();
     }
 
     // ========== Positions CRUD ==========
