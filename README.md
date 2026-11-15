@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # مدیریت ساختار سازمانی
 
 ابزار تحت‌وب برای تعریف فیلدها، مدیریت سمت‌ها و نمایش ساختار درختی سازمانی.
@@ -51,3 +52,7 @@ https://github.com/mehdi-28/Org-Ch
 ## نویسنده
 
 [mehdi-28](https://github.com/mehdi-28)
+=======
+# Org-St
+ORGANIZATION CHART
+>>>>>>> 1f67804377a24d74ade7f5fd2ae18c5af74a3ca4
