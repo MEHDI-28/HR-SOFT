@@ -107,21 +107,22 @@
             <!-- Edit mode -->
             <div id="fd-edit-mode" class="hidden space-y-3">
               <div>
-                <label class="block text-xs font-medium text-slate-600 mb-1">شناسه (ID)</label>
-                <input type="text" id="fd-edit-key" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" dir="ltr" />
-                <p class="text-[10px] text-slate-400 mt-0.5" id="fd-key-hint">برای فیلدهای سیستمی قابل تغییر نیست</p>
+                <label class="block text-xs font-medium text-slate-600 mb-1">شناسه (ID) — خودکار</label>
+                <input type="text" id="fd-edit-key" readonly class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono bg-slate-50 text-slate-600" dir="ltr" />
+                <p class="text-[10px] text-slate-400 mt-0.5" id="fd-key-hint">شناسه به‌صورت خودکار ساخته می‌شود و قابل ویرایش دستی نیست</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">عنوان</label>
-                <input type="text" id="fd-edit-label" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                <input type="text" id="fd-edit-label" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="onFieldLabelInput()" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-slate-600 mb-1">توضیحات</label>
                 <textarea id="fd-edit-desc" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
               </div>
-              <div class="flex gap-2 pt-1">
+              <div class="flex flex-wrap gap-2 pt-1">
                 <button type="button" onclick="saveFieldEdit()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">ذخیره</button>
                 <button type="button" onclick="cancelFieldEdit()" class="px-4 py-2 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">انصراف</button>
+                <button type="button" id="fd-btn-delete-edit" onclick="removeSelectedField()" class="px-4 py-2 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50 hidden">حذف فیلد</button>
               </div>
             </div>
 
@@ -451,6 +452,38 @@
       return !!defaultFields.find(d => d.key === f.key);
     }
 
+    /** Auto-generate unique field key from label or sequential field_N */
+    function generateFieldKey(label) {
+      let base = (label || "").trim()
+        .replace(/[\s\u200c]+/g, "_")
+        .replace(/[^\w\u0600-\u06FF_]/g, "")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "");
+      if (!base) base = "field";
+      // Prefer latin-only system keys when possible
+      if (/^[\u0600-\u06FF_]/.test(base) || /[\u0600-\u06FF]/.test(base)) {
+        base = "field";
+      }
+      base = base.toLowerCase().slice(0, 40) || "field";
+      let key = base;
+      let n = 1;
+      const existing = new Set(fields.map(f => f.key));
+      // When editing, allow keeping current key
+      while (existing.has(key)) {
+        n += 1;
+        key = base + "_" + n;
+      }
+      return key;
+    }
+
+    function onFieldLabelInput() {
+      // Only auto-update key while creating a new field
+      if (selectedFieldIndex !== -2) return;
+      const label = document.getElementById("fd-edit-label")?.value || "";
+      const keyEl = document.getElementById("fd-edit-key");
+      if (keyEl) keyEl.value = generateFieldKey(label);
+    }
+
     function renderFields() {
       ensureFields();
       const nav = document.getElementById("fields-nav-list");
@@ -469,15 +502,18 @@
         const active = i === selectedFieldIndex;
         const core = isCoreField(f);
         return `
-          <button type="button"
-            onclick="selectField(${i})"
-            class="w-full text-right px-4 py-3 hover:bg-blue-50 transition ${active ? 'bg-blue-50 border-r-4 border-blue-600' : ''}">
-            <div class="font-medium text-sm text-slate-800 truncate">${escapeHtml(f.label || f.key)}</div>
-            <div class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(f.key)}${core ? ' · سیستمی' : ''}${f.required ? ' · الزامی' : ''}</div>
-          </button>`;
+          <div class="flex items-stretch group ${active ? 'bg-blue-50 border-r-4 border-blue-600' : 'hover:bg-slate-50'}">
+            <button type="button"
+              onclick="selectField(${i})"
+              class="flex-1 text-right px-4 py-3 transition min-w-0">
+              <div class="font-medium text-sm text-slate-800 truncate">${escapeHtml(f.label || f.key)}</div>
+              <div class="text-[11px] text-slate-400 font-mono mt-0.5 truncate">${escapeHtml(f.key)}${core ? ' · سیستمی' : ' · سفارشی'}${f.required ? ' · الزامی' : ''}</div>
+            </button>
+            ${!core ? `<button type="button" title="حذف فیلد" onclick="event.stopPropagation(); selectField(${i}); removeSelectedField();"
+              class="px-2 text-red-400 hover:text-red-600 hover:bg-red-50 text-sm shrink-0">حذف</button>` : ""}
+          </div>`;
       }).join("");
 
-      // Keep detail in sync
       if (selectedFieldIndex >= 0 && selectedFieldIndex < fields.length) {
         showFieldDetail(selectedFieldIndex, false);
       } else if (selectedFieldIndex === -2) {
@@ -519,13 +555,13 @@
       if (delBtn) delBtn.classList.toggle("hidden", core);
 
       document.getElementById("fd-edit-key").value = f.key || "";
-      document.getElementById("fd-edit-key").readOnly = core;
-      document.getElementById("fd-edit-key").classList.toggle("bg-slate-50", core);
-      document.getElementById("fd-key-hint").textContent = core
-        ? "شناسه فیلدهای سیستمی قابل تغییر نیست"
-        : "شناسه یکتا به انگلیسی (مثلاً customNote)";
+      document.getElementById("fd-edit-key").readOnly = true;
+      document.getElementById("fd-key-hint").textContent = "شناسه به‌صورت خودکار ساخته شده و قابل ویرایش دستی نیست";
       document.getElementById("fd-edit-label").value = f.label || "";
       document.getElementById("fd-edit-desc").value = f.desc || "";
+
+      const delEdit = document.getElementById("fd-btn-delete-edit");
+      if (delEdit) delEdit.classList.toggle("hidden", core);
 
       if (editMode) {
         document.getElementById("fd-view-mode").classList.add("hidden");
@@ -584,18 +620,16 @@
     }
 
     function saveFieldEdit() {
-      const keyInput = (document.getElementById("fd-edit-key").value || "").trim().replace(/\s+/g, "_");
       const label = (document.getElementById("fd-edit-label").value || "").trim();
       const desc = (document.getElementById("fd-edit-desc").value || "").trim();
 
-      if (!keyInput) { alert("شناسه الزامی است."); return; }
       if (!label) { alert("عنوان الزامی است."); return; }
 
-      // New field
+      // New field — auto ID
       if (selectedFieldIndex === -2) {
-        if (fields.some(f => f.key === keyInput)) {
-          alert("این شناسه قبلاً استفاده شده است.");
-          return;
+        let keyInput = (document.getElementById("fd-edit-key").value || "").trim();
+        if (!keyInput || fields.some(f => f.key === keyInput)) {
+          keyInput = generateFieldKey(label);
         }
         const neu = {
           key: keyInput,
@@ -618,21 +652,12 @@
         return;
       }
 
+      // Edit existing — key stays fixed (auto, not user-editable)
       const idx = selectedFieldIndex;
       if (idx < 0 || idx >= fields.length) return;
       const f = fields[idx];
-      const core = isCoreField(f);
-      const oldKey = f.key;
-
-      if (!core && keyInput !== oldKey) {
-        if (fields.some((x, i) => i !== idx && x.key === keyInput)) {
-          alert("این شناسه قبلاً استفاده شده است.");
-          return;
-        }
-      }
 
       const changes = [];
-      if (!core && keyInput !== f.key) changes.push({ field: "شناسه", from: f.key, to: keyInput });
       if (label !== (f.label || "")) changes.push({ field: "عنوان", from: f.label || "", to: label });
       if (desc !== (f.desc || "")) changes.push({ field: "توضیحات", from: f.desc || "", to: desc });
 
@@ -641,16 +666,8 @@
         return;
       }
 
-      if (!core) f.key = keyInput;
       f.label = label;
       f.desc = desc;
-
-      // If key renamed, move history bucket
-      if (!core && keyInput !== oldKey && fieldHistory[oldKey]) {
-        fieldHistory[keyInput] = (fieldHistory[keyInput] || []).concat(fieldHistory[oldKey]);
-        delete fieldHistory[oldKey];
-        saveFieldHistory();
-      }
 
       pushFieldHistory(f.key, "ویرایش", changes);
       save();
@@ -663,22 +680,24 @@
       document.getElementById("field-detail-empty").classList.add("hidden");
       document.getElementById("field-detail-panel").classList.remove("hidden");
       document.getElementById("fd-heading").textContent = "فیلد جدید";
-      document.getElementById("fd-key-badge").textContent = "در حال ایجاد";
+      document.getElementById("fd-key-badge").textContent = "شناسه پس از وارد کردن عنوان خودکار ساخته می‌شود";
       document.getElementById("fd-view-mode").classList.add("hidden");
       document.getElementById("fd-edit-mode").classList.remove("hidden");
       document.getElementById("fd-btn-edit").classList.add("hidden");
       document.getElementById("fd-btn-delete").classList.add("hidden");
-      document.getElementById("fd-edit-key").value = "";
-      document.getElementById("fd-edit-key").readOnly = false;
-      document.getElementById("fd-edit-key").classList.remove("bg-slate-50");
-      document.getElementById("fd-key-hint").textContent = "شناسه یکتا به انگلیسی (مثلاً customNote)";
+      const delEdit = document.getElementById("fd-btn-delete-edit");
+      if (delEdit) delEdit.classList.add("hidden");
+      document.getElementById("fd-edit-key").value = generateFieldKey("");
+      document.getElementById("fd-edit-key").readOnly = true;
+      document.getElementById("fd-key-hint").textContent = "با نوشتن عنوان، شناسه به‌صورت خودکار به‌روز می‌شود";
       document.getElementById("fd-edit-label").value = "";
       document.getElementById("fd-edit-desc").value = "";
       document.getElementById("fd-history").innerHTML = `<p class="text-slate-400 text-xs">پس از ذخیره، تاریخچه اینجا نمایش داده می‌شود.</p>`;
-      // clear active state in list
       const nav = document.getElementById("fields-nav-list");
       if (nav) {
-        nav.querySelectorAll("button").forEach(b => b.classList.remove("bg-blue-50", "border-r-4", "border-blue-600"));
+        nav.querySelectorAll(".border-r-4").forEach(el => {
+          el.classList.remove("bg-blue-50", "border-r-4", "border-blue-600");
+        });
       }
     }
 
