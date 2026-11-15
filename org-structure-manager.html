@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>مدیریت ساختار سازمانی</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.003/Vazirmatn-font-face.css" rel="stylesheet" />
+  <style>
+    body { font-family: Vazirmatn, system-ui, sans-serif; }
+    .tree-node { }
+    .tree-node:hover > .node-card { background-color: #f0f9ff; border-color: #93c5fd; }
+    #tree-container { overflow: auto; max-height: 75vh; contain: layout style; }
+    .node-card { contain: content; }
+    .field-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #2563eb; font-weight: 600; }
+    .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.85); z-index: 50; display: flex; align-items: center; justify-content: center; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pos-row:hover { background: #f8fafc; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div id="loading" class="loading-overlay hidden">
+    <div class="text-center">
+      <div class="spinner mx-auto mb-3"></div>
+      <div class="text-sm text-slate-600" id="loading-text">در حال پردازش فایل اکسل...</div>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="mb-6">
+      <h1 class="text-2xl md:text-3xl font-bold text-slate-900">مدیریت ساختار سازمانی شرکت</h1>
+      <p class="text-slate-600 mt-1">تنظیمات و تعاریف، مدیریت سمت‌ها و ترسیم ساختار درختی — پشتیبانی از ورود مستقیم فایل اکسل</p>
+    </header>
+
+    <nav class="flex gap-1 border-b border-slate-200 mb-6 overflow-x-auto">
+      <button onclick="switchTab('fields')" id="tab-fields" class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap tab-active">۱. تنظیمات و تعاریف</button>
+      <button onclick="switchTab('positions')" id="tab-positions" class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap text-slate-600 hover:text-slate-900">۲. مدیریت سمت‌ها</button>
+      <button onclick="switchTab('tree')" id="tab-tree" class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap text-slate-600 hover:text-slate-900">۳. ساختار درختی</button>
+      <button onclick="switchTab('export')" id="tab-export" class="tab-btn px-4 py-2.5 text-sm whitespace-nowrap text-slate-600 hover:text-slate-900">ورود / خروجی فایل</button>
+    </nav>
+
+    <!-- Tab: Settings & Definitions -->
+    <section id="panel-fields" class="tab-panel">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-lg font-semibold">تنظیمات و تعاریف فیلدها</h2>
+            <p class="text-sm text-slate-500">هر فیلد دارای <strong>شناسه</strong>، <strong>عنوان</strong> و <strong>توضیحات</strong> جداگانه است. شناسه برای سیستم و عنوان برای نمایش استفاده می‌شود.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="resetFieldsToDefault()" class="px-3 py-1.5 border border-slate-300 text-sm rounded-lg hover:bg-slate-50">بازنشانی به پیش‌فرض</button>
+            <button onclick="addCustomField()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">+ فیلد سفارشی</button>
+          </div>
+        </div>
+        <div id="fields-list" class="grid gap-4 md:grid-cols-2"></div>
+      </div>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+        <strong>نکته:</strong> فیلدهای کلیدی درخت: شناسه <code class="bg-amber-100 px-1 rounded">id</code> (شماره سمت) و <code class="bg-amber-100 px-1 rounded">parentId</code> (سمت بالاتر). شناسه را فقط در صورت نیاز تغییر دهید.
+      </div>
+    </section>
+
+    <!-- Tab: Positions -->
+    <section id="panel-positions" class="tab-panel hidden">
+      <div class="grid lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-1 bg-white rounded-xl shadow-sm border border-slate-200 p-5 h-fit sticky top-4">
+          <h2 class="text-lg font-semibold mb-3" id="form-title">افزودن سمت جدید</h2>
+          <form id="pos-form" class="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+            <input type="hidden" id="edit-id" />
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">شماره سمت *</label>
+              <input type="text" id="f-id" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500" placeholder="مثلاً 39/000000001" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">عنوان سمت *</label>
+              <input type="text" id="f-title" required class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">سمت بالاتر (والد)</label>
+              <select id="f-parentId" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500">
+                <option value="">— ریشه / بدون والد —</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">امور / دپارتمان</label>
+                <input type="text" id="f-dept" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">واحد</label>
+                <input type="text" id="f-unit" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">عنوان شغل</label>
+              <input type="text" id="f-jobTitle" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">پایه سمت</label>
+                <input type="text" id="f-base" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">نوع ساختار</label>
+                <input type="text" id="f-structType" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" placeholder="مصوب / برون سپاری" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">حداقل گروه</label>
+                <input type="text" id="f-minGroup" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">حداکثر گروه</label>
+                <input type="text" id="f-maxGroup" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">شرایط احراز (رشته تحصیلی)</label>
+              <textarea id="f-education" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm"></textarea>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">تجربه (سال)</label>
+              <input type="text" id="f-experience" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">کد بیمه</label>
+                <input type="text" id="f-insCode" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">عنوان بیمه</label>
+                <input type="text" id="f-insTitle" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">رده هلدینگ</label>
+                <input type="text" id="f-holdingRank" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-0.5">رده مدیریت</label>
+                <input type="text" id="f-mgmtRank" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">ماهیت شغل</label>
+              <input type="text" id="f-jobNature" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-0.5">تاپ چارت</label>
+              <input type="text" id="f-topChart" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm" placeholder="* برای چارت اصلی" />
+            </div>
+            <div class="flex gap-2 pt-2">
+              <button type="submit" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">ذخیره</button>
+              <button type="button" onclick="resetForm()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">انصراف</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 class="text-lg font-semibold">فهرست سمت‌ها <span id="pos-count" class="text-slate-400 text-sm font-normal">(0)</span></h2>
+            <div class="flex flex-wrap gap-2">
+              <input type="search" id="search-pos" placeholder="جستجو..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-48 focus:ring-2 focus:ring-blue-500" oninput="renderPositionsList()" />
+              <select id="filter-dept" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm" onchange="renderPositionsList()">
+                <option value="">همه امور</option>
+              </select>
+            </div>
+          </div>
+          <div id="positions-list" class="space-y-1.5 max-h-[65vh] overflow-y-auto"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab: Tree -->
+    <section id="panel-tree" class="tab-panel hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-lg font-semibold">نمایش ساختار درختی</h2>
+            <p class="text-sm text-slate-500">Virtual Scroll — فقط ردیف‌های داخل صفحه ساخته می‌شوند</p>
+          </div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <button onclick="expandLevel(1)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">سطح ۱</button>
+            <button onclick="expandLevel(2)" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">سطح ۲</button>
+            <button onclick="collapseAll()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50">بستن همه</button>
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="checkbox" id="show-details" onchange="onTreeOptionsChange()" class="rounded" /> جزئیات
+            </label>
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+              <input type="checkbox" id="only-top-chart" onchange="onTreeOptionsChange()" class="rounded" /> فقط تاپ‌چارت
+            </label>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-3">
+          <input type="search" id="tree-search" placeholder="جستجو در درخت (عنوان یا شماره سمت)..." class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[200px] focus:ring-2 focus:ring-blue-500" oninput="onTreeSearch()" />
+          <select id="tree-dept-filter" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm" onchange="onTreeOptionsChange()">
+            <option value="">همه امور</option>
+          </select>
+        </div>
+        <div id="tree-stats" class="text-sm text-slate-500 mb-3"></div>
+        <!-- Virtual scroll viewport -->
+        <div id="tree-viewport" class="border border-slate-200 rounded-lg bg-slate-50/50 relative" style="height:72vh;overflow:auto;">
+          <div id="tree-phantom" style="position:relative;width:100%;">
+            <div id="tree-window" style="position:absolute;left:0;right:0;top:0;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab: Import / Export -->
+    <section id="panel-export" class="tab-panel hidden">
+      <div class="grid md:grid-cols-2 gap-5">
+        <!-- Excel Import -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <h2 class="text-lg font-semibold mb-2">ورود مستقیم فایل اکسل</h2>
+          <p class="text-sm text-slate-500 mb-4">فایل <strong>ساختار سازمانی.xlsx</strong> را انتخاب کنید. تمام سمت‌ها (حدود ۱۹۰۰+) وارد و درخت ساخته می‌شود.</p>
+          
+          <div class="border-2 border-dashed border-blue-200 rounded-xl p-6 text-center bg-blue-50/50 hover:bg-blue-50 transition cursor-pointer" id="drop-zone"
+               onclick="document.getElementById('excel-file').click()"
+               ondragover="event.preventDefault(); this.classList.add('border-blue-400','bg-blue-100')"
+               ondragleave="this.classList.remove('border-blue-400','bg-blue-100')"
+               ondrop="handleDrop(event)">
+            <div class="text-3xl mb-2">📊</div>
+            <div class="font-medium text-blue-800 mb-1">کلیک یا کشیدن فایل اکسل</div>
+            <div class="text-xs text-slate-500">پشتیبانی از .xlsx و .xls</div>
+            <input type="file" id="excel-file" accept=".xlsx,.xls" class="hidden" onchange="importExcel(event)" />
+          </div>
+
+          <div class="mt-4 space-y-2 text-xs text-slate-600">
+            <p>• ستون‌ها به‌صورت خودکار بر اساس نام هدر فارسی مپ می‌شوند.</p>
+            <p>• سمت‌هایی که والد آن‌ها خودشان است (مثل مدیرعامل) به‌عنوان ریشه در نظر گرفته می‌شوند.</p>
+            <p>• داده‌های فعلی جایگزین خواهند شد.</p>
+          </div>
+
+          <div id="import-result" class="mt-4 hidden"></div>
+        </div>
+
+        <!-- JSON + Sample -->
+        <div class="space-y-5">
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-lg font-semibold mb-2">خروجی JSON</h2>
+            <p class="text-sm text-slate-500 mb-3">ذخیره ساختار فعلی برای استفاده بعدی یا پشتیبان‌گیری.</p>
+            <button onclick="exportJSON()" class="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">دانلود JSON</button>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-lg font-semibold mb-2">ورود JSON / نمونه</h2>
+            <input type="file" id="import-json-file" accept=".json" class="block w-full text-sm mb-3" onchange="importJSON(event)" />
+            <button onclick="loadSampleData()" class="w-full bg-emerald-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700">بارگذاری نمونه کوچک (۴۸ سمت)</button>
+          </div>
+          <div class="bg-slate-50 rounded-lg p-4 text-xs text-slate-600">
+            <p class="font-medium mb-1">وضعیت فعلی:</p>
+            <p id="status-text">۰ سمت بارگذاری شده</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ========== Schema ==========
+    const defaultFields = [
+      { key: "id", label: "شماره سمت", desc: "شناسه یکتای سمت — کلید اصلی درخت سازمانی", type: "text", required: true, source: "شماره سمت" },
+      { key: "title", label: "عنوان سمت", desc: "نام رسمی و نمایشی سمت در چارت و گزارش‌ها", type: "text", required: true, source: "عنوان سمت" },
+      { key: "parentId", label: "شماره سمت موقعیت بالاتر", desc: "شناسه سمت والد برای ساخت سلسله‌مراتب درختی", type: "select", required: false, source: "شماره سمت موقعیت بالاتر" },
+      { key: "dept", label: "امور", desc: "دپارتمان یا امور اصلی سازمانی (مثلاً مدیریت، HSE، منابع انسانی)", type: "text", required: false, source: "امور" },
+      { key: "unit", label: "واحد", desc: "واحد سازمانی زیرمجموعه امور", type: "text", required: false, source: "واحد" },
+      { key: "jobTitle", label: "عنوان شغل", desc: "عنوان شغلی استاندارد مرتبط با سمت", type: "text", required: false, source: "عنوان شغل" },
+      { key: "base", label: "پایه سمت", desc: "پایه یا سطح سمت (مانند A، B، C، OD)", type: "text", required: false, source: "پایه سمت" },
+      { key: "topChart", label: "تاپ چارت", desc: "علامت * برای نمایش در چارت اصلی سازمانی", type: "text", required: false, source: "تاپ چارت" },
+      { key: "structType", label: "نوع ساختار", desc: "نوع ساختار سمت (مصوب، برون‌سپاری و ...)", type: "text", required: false, source: "نوع ساختار" },
+      { key: "minGroup", label: "حداقل گروه", desc: "حداقل گروه شغلی مجاز برای احراز سمت", type: "text", required: false, source: "حداقل گروه" },
+      { key: "maxGroup", label: "حداکثر گروه", desc: "حداکثر گروه شغلی مجاز برای احراز سمت", type: "text", required: false, source: "حداكثرگروه" },
+      { key: "education", label: "شرایط احراز (رشته تحصیلی)", desc: "مدارک و رشته‌های تحصیلی مورد نیاز برای تصدی سمت", type: "textarea", required: false, source: "شرایط احراز (رشته تحصیلی)" },
+      { key: "experience", label: "تجربه", desc: "حداقل سابقه کار مورد نیاز (بر حسب سال)", type: "text", required: false, source: "تجربه" },
+      { key: "insCode", label: "کد بیمه", desc: "کد شغل در سیستم بیمه تأمین اجتماعی", type: "text", required: false, source: "کد بیمه" },
+      { key: "insTitle", label: "عنوان بیمه", desc: "عنوان شغل ثبت‌شده در سیستم بیمه", type: "text", required: false, source: "عنوان بیمه" },
+      { key: "holdingRank", label: "رده هلدینگ", desc: "رده سازمانی در سطح هلدینگ", type: "text", required: false, source: "رده هلدینگ" },
+      { key: "mgmtRank", label: "رده مدیریت", desc: "رده مدیریتی (مدیرعامل، مدیر، رئیس، کارشناس و ...)", type: "text", required: false, source: "رده مدیریت" },
+      { key: "jobNature", label: "ماهیت شغل", desc: "ماهیت شغل (ستادی و تشکیلاتی، خدمات تولید، بازاریابی و فروش و ...)", type: "text", required: false, source: "ماهیت شغل" },
+    ];
+
+    let fields;
+    try {
+      const stored = JSON.parse(localStorage.getItem("org_fields") || "null");
+      fields = (Array.isArray(stored) && stored.length > 0) ? stored : structuredClone(defaultFields);
+    } catch {
+      fields = structuredClone(defaultFields);
+    }
+    let positions = [];
+    try {
+      positions = JSON.parse(localStorage.getItem("org_positions") || "[]") || [];
+    } catch {
+      positions = [];
+    }
+
+    // Sample (small)
+    const SAMPLE_DATA = [{"id":"39/000000001","dept":"مدیریت","unit":"مدیریت","jobTitle":"","title":"مدیرعامل","base":"OD","topChart":"*","structType":"مصوب","parentId":"","minGroup":"","maxGroup":"","education":"دکتری یا کارشناسی ارشد مدیریت/ مدیریت اجرایی/مهندسی شیمی/مهندسی مکنیک/مهندسی صنایع","experience":"20-18","insCode":"027079","insTitle":"مديرعامل","holdingRank":"کارشناس ارشد","mgmtRank":"مدیرعامل","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000002001","dept":"مدیریت","unit":"مدیریت","jobTitle":"کارشناس اداری و منابع انسانی","title":"مسئول دبیرخانه هیات مدیره","base":"16","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"12","maxGroup":"17","education":"کارشناسی مدیریت/ کارشناسی","experience":"10","insCode":"144827","insTitle":"مسئول دبيرخانه هيات مديره","holdingRank":"کارشناس","mgmtRank":"مسئول","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000004001","dept":"مدیریت","unit":"مدیریت","jobTitle":"کارشناس مالی","title":"مسئول مبارزه با پولشویی","base":"17","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"12","maxGroup":"17","education":"کارشناسی حسابداری/ حسابرسی/مدیریت مالی/اقتصاد","experience":"12","insCode":"154744","insTitle":"مسئول مبارزه با پولشويي","holdingRank":"کارشناس","mgmtRank":"مسئول","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000001001","dept":"مدیریت","unit":"دفتر مدیرعامل","jobTitle":"کارشناس اداری و منابع انسانی","title":"رئیس دفتر مدیرعامل","base":"A","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"12","maxGroup":"17","education":"کارشناسی مدیریت/ کارشناسی","experience":"14","insCode":"113995","insTitle":"رييس دفتر مدير عامل","holdingRank":"کارشناس","mgmtRank":"رئیس","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000001011","dept":"مدیریت","unit":"دفتر مدیرعامل","jobTitle":"کارمند اداری و منابع انسانی","title":"کارمند دفتری","base":"10","topChart":"","structType":"مصوب","parentId":"39/000001001","minGroup":"6","maxGroup":"11","education":"دیپلم","experience":"8","insCode":"032888","insTitle":"کارمند دفتري","holdingRank":"کارمند/ کارگر فنی","mgmtRank":"کارمند","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000100001","dept":"ریاست حسابرسی داخلی","unit":"حسابرسی داخلی","jobTitle":"کارشناس مدیر مالی ارشد","title":"رئیس حسابرسی داخلی","base":"B","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"16","maxGroup":"20","education":"کارشناسی‌ارشد حسابداری/ حسابرسی/ مدیریت مالی","experience":"14","insCode":"033765","insTitle":"رئيس حسابرسي داخلي","holdingRank":"کارشناس ارشد","mgmtRank":"مدیر","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000200001","dept":"مدیریت پیمان ها و حقوقی","unit":"مدیریت پیمان ها و حقوقی","jobTitle":"کارشناس پيمان ها و حقوقي ارشد","title":"مدیر پیمان‌ها و حقوقی","base":"C","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"16","maxGroup":"20","education":"کارشناسی‌ارشد  حقوق/حقوق تجارت/مدیریت بازرگانی/اقتصاد","experience":"16","insCode":"154749","insTitle":"مدير پيمان‌ها و حقوقي","holdingRank":"کارشناس ارشد","mgmtRank":"مدیر","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000300001","dept":"ریاست روابط عمومی و مسئولیت اجتماعی","unit":"روابط عمومی و مسئولیت اجتماعی","jobTitle":"کارشناس روابط‌عمومی و مسئولیت اجتماعی","title":"رئیس روابط‌عمومی و مسئولیت اجتماعی","base":"A","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"12","maxGroup":"17","education":"کارشناسی روابط عمومی/ علوم ارتباطات/ مدیریت","experience":"14","insCode":"154751","insTitle":"رئيس روابط ‌عمومي و مسئوليت اجتماعي","holdingRank":"کارشناس","mgmtRank":"مدیر","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000400001","dept":"مدیریت حراست، حفاظت و امنیت","unit":"مدیریت حراست، حفاظت و امنیت","jobTitle":"کارشناس حراست ارشد","title":"مدیر حراست، حفاظت و امنیت","base":"B","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"16","maxGroup":"20","education":"کارشناسی‌ارشد  علوم سیاسی/ علوم انتظامی/ مدیریت","experience":"14","insCode":"154752","insTitle":"مدير حراست، حفاظت و امنيت","holdingRank":"کارشناس ارشد","mgmtRank":"مدیر","jobNature":"ستادی و تشکیلاتی"},{"id":"39/000500001","dept":"مدیریت سلامت، ایمنی و محیط زیست (HSE)","unit":"مدیریت سلامت، ایمنی و محیط زیست (HSE)","jobTitle":"کارشناس سلامت، ايمني و محيط زيست (HSE) ارشد","title":"مدیر سلامت، ایمنی و محیط زیست (HSE)","base":"C","topChart":"*","structType":"مصوب","parentId":"39/000000001","minGroup":"16","maxGroup":"20","education":"کارشناسی‌ارشد یمهندسی HSE/ مهندسي ايمني/ شيمي/ مهندسی صنايع","experience":"16","insCode":"074389","insTitle":"مدير سلامت، ايمني و محيط زيست (HSE)","holdingRank":"کارشناس ارشد","mgmtRank":"مدیر","jobNature":"خدمات تولید"}];
+
+    function save() {
+      localStorage.setItem("org_fields", JSON.stringify(fields));
+      localStorage.setItem("org_positions", JSON.stringify(positions));
+      updateStatus();
+    }
+
+    function updateStatus() {
+      const el = document.getElementById("status-text");
+      if (el) el.textContent = positions.length + " سمت بارگذاری شده";
+    }
+
+    function showLoading(msg) {
+      document.getElementById("loading-text").textContent = msg || "در حال پردازش...";
+      document.getElementById("loading").classList.remove("hidden");
+    }
+    function hideLoading() {
+      document.getElementById("loading").classList.add("hidden");
+    }
+
+    // ========== Tabs ==========
+    function switchTab(name) {
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.add("hidden"));
+      document.querySelectorAll(".tab-btn").forEach(b => {
+        b.classList.remove("tab-active");
+        b.classList.add("text-slate-600");
+      });
+      document.getElementById("panel-" + name).classList.remove("hidden");
+      const btn = document.getElementById("tab-" + name);
+      btn.classList.add("tab-active");
+      btn.classList.remove("text-slate-600");
+      if (name === "positions") { populateParentSelect(); populateDeptFilter(); renderPositionsList(); }
+      if (name === "tree") { rebuildTreeData(); renderTree(); }
+      if (name === "fields") renderFields();
+      if (name === "export") updateStatus();
+    }
+
+    // ========== Fields / Settings & Definitions ==========
+    function ensureFields() {
+      if (!Array.isArray(fields) || fields.length === 0) {
+        fields = structuredClone(defaultFields);
+        save();
+      }
+    }
+
+    function renderFields() {
+      ensureFields();
+      const container = document.getElementById("fields-list");
+      if (!container) return;
+
+      if (!fields.length) {
+        container.innerHTML = `<div class="col-span-2 text-center text-slate-400 py-10">هیچ فیلدی تعریف نشده. روی «بازنشانی به پیش‌فرض» کلیک کنید.</div>`;
+        return;
+      }
+
+      container.innerHTML = fields.map((f, i) => {
+        const isCore = !!defaultFields.find(d => d.key === f.key);
+        return `
+        <div class="field-card border border-slate-200 rounded-xl p-4 bg-white shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-medium text-slate-500">فیلد ${i + 1}${f.required ? ' · <span class="text-red-600">الزامی</span>' : ''}</span>
+            ${!isCore ? `<button type="button" onclick="removeField(${i})" class="text-xs text-red-500 hover:text-red-700 hover:underline">حذف فیلد</button>` : `<span class="text-[10px] text-slate-400">سیستمی</span>`}
+          </div>
+
+          <!-- شناسه -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-slate-600 mb-1">شناسه (ID)</label>
+            <input type="text"
+              value="${escapeHtml(f.key)}"
+              ${isCore ? 'readonly' : ''}
+              onchange="updateFieldKey(${i}, this.value)"
+              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono ${isCore ? 'bg-slate-50 text-slate-500' : 'focus:ring-2 focus:ring-blue-500 focus:border-blue-500'}"
+              dir="ltr"
+              placeholder="مثلاً customNote" />
+            <p class="text-[10px] text-slate-400 mt-0.5">شناسه یکتا برای سیستم — برای فیلدهای اصلی قابل تغییر نیست</p>
+          </div>
+
+          <!-- عنوان -->
+          <div class="mb-3">
+            <label class="block text-xs font-medium text-slate-600 mb-1">عنوان</label>
+            <input type="text"
+              value="${escapeHtml(f.label || '')}"
+              onchange="fields[${i}].label = this.value; save();"
+              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="عنوان نمایشی فیلد" />
+          </div>
+
+          <!-- توضیحات -->
+          <div class="mb-1">
+            <label class="block text-xs font-medium text-slate-600 mb-1">توضیحات</label>
+            <textarea rows="2"
+              onchange="fields[${i}].desc = this.value; save();"
+              class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+              placeholder="توضیح کوتاه درباره کاربرد این فیلد">${escapeHtml(f.desc || '')}</textarea>
+          </div>
+
+          ${f.source ? `<div class="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100">منبع اکسل: ${escapeHtml(f.source)}</div>` : ''}
+        </div>
+        `;
+      }).join('');
+    }
+
+    function updateFieldKey(index, newKey) {
+      newKey = (newKey || '').trim();
+      if (!newKey) {
+        alert('شناسه نمی‌تواند خالی باشد.');
+        renderFields();
+        return;
+      }
+      if (fields.some((f, i) => i !== index && f.key === newKey)) {
+        alert('این شناسه قبلاً استفاده شده است.');
+        renderFields();
+        return;
+      }
+      fields[index].key = newKey;
+      save();
+    }
+
+    function removeField(index) {
+      if (!confirm('این فیلد سفارشی حذف شود؟')) return;
+      fields.splice(index, 1);
+      save();
+      renderFields();
+    }
+
+    function addCustomField() {
+      const key = prompt('شناسه انگلیسی فیلد جدید (مثلاً customNote):');
+      if (!key) return;
+      const cleanKey = key.trim().replace(/\s+/g, '_');
+      if (!cleanKey || fields.some(f => f.key === cleanKey)) {
+        alert('شناسه نامعتبر یا تکراری است.');
+        return;
+      }
+      const label = prompt('عنوان نمایشی فیلد:', cleanKey) || cleanKey;
+      fields.push({
+        key: cleanKey,
+        label: label,
+        desc: '',
+        type: 'text',
+        required: false,
+        source: 'سفارشی'
+      });
+      save();
+      renderFields();
+    }
+
+    function resetFieldsToDefault() {
+      if (!confirm('تمام تغییرات فیلدها به حالت پیش‌فرض برگردانده شود؟')) return;
+      fields = structuredClone(defaultFields);
+      save();
+      renderFields();
+    }
+
+    // ========== Positions CRUD ==========
+    function populateParentSelect() {
+      const sel = document.getElementById("f-parentId");
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— ریشه / بدون والد —</option>';
+      // For large lists, only show top-level + search would be better, but simple for now
+      const sorted = positions.slice().sort((a, b) => (a.title || "").localeCompare(b.title || "", "fa"));
+      // Limit options to avoid huge DOM if > 500
+      const toShow = sorted.length > 400 ? sorted.filter(p => p.topChart === "*" || !p.parentId || p.parentId === p.id).concat(sorted.slice(0, 200)) : sorted;
+      const seen = new Set();
+      toShow.forEach(p => {
+        if (seen.has(p.id)) return;
+        seen.add(p.id);
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = `${p.title} (${p.id})`;
+        sel.appendChild(opt);
+      });
+      sel.value = current;
+    }
+
+    function populateDeptFilter() {
+      const sel = document.getElementById("filter-dept");
+      const current = sel.value;
+      const depts = [...new Set(positions.map(p => p.dept).filter(Boolean))].sort((a,b) => a.localeCompare(b, "fa"));
+      sel.innerHTML = '<option value="">همه امور</option>' + depts.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join("");
+      sel.value = current;
+    }
+
+    function resetForm() {
+      document.getElementById("pos-form").reset();
+      document.getElementById("edit-id").value = "";
+      document.getElementById("form-title").textContent = "افزودن سمت جدید";
+      document.getElementById("f-id").disabled = false;
+    }
+
+    document.getElementById("pos-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const id = document.getElementById("f-id").value.trim();
+      if (!id) return alert("شماره سمت الزامی است.");
+      const editId = document.getElementById("edit-id").value;
+      const parentId = document.getElementById("f-parentId").value;
+      if (parentId === id) return alert("سمت نمی‌تواند والد خودش باشد.");
+
+      const data = {
+        id, title: document.getElementById("f-title").value.trim(), parentId,
+        dept: document.getElementById("f-dept").value.trim(),
+        unit: document.getElementById("f-unit").value.trim(),
+        jobTitle: document.getElementById("f-jobTitle").value.trim(),
+        base: document.getElementById("f-base").value.trim(),
+        topChart: document.getElementById("f-topChart").value.trim(),
+        structType: document.getElementById("f-structType").value.trim(),
+        minGroup: document.getElementById("f-minGroup").value.trim(),
+        maxGroup: document.getElementById("f-maxGroup").value.trim(),
+        education: document.getElementById("f-education").value.trim(),
+        experience: document.getElementById("f-experience").value.trim(),
+        insCode: document.getElementById("f-insCode").value.trim(),
+        insTitle: document.getElementById("f-insTitle").value.trim(),
+        holdingRank: document.getElementById("f-holdingRank").value.trim(),
+        mgmtRank: document.getElementById("f-mgmtRank").value.trim(),
+        jobNature: document.getElementById("f-jobNature").value.trim(),
+      };
+
+      if (editId) {
+        const idx = positions.findIndex(p => p.id === editId);
+        if (idx >= 0) positions[idx] = data;
+      } else {
+        if (positions.some(p => p.id === id)) return alert("این شماره سمت قبلاً وجود دارد.");
+        positions.push(data);
+      }
+      save();
+      resetForm();
+      populateParentSelect();
+      populateDeptFilter();
+      renderPositionsList();
+    });
+
+    function editPosition(id) {
+      const p = positions.find(x => x.id === id);
+      if (!p) return;
+      document.getElementById("edit-id").value = id;
+      document.getElementById("form-title").textContent = "ویرایش سمت";
+      document.getElementById("f-id").value = p.id;
+      document.getElementById("f-id").disabled = true;
+      document.getElementById("f-title").value = p.title || "";
+      document.getElementById("f-parentId").value = p.parentId || "";
+      document.getElementById("f-dept").value = p.dept || "";
+      document.getElementById("f-unit").value = p.unit || "";
+      document.getElementById("f-jobTitle").value = p.jobTitle || "";
+      document.getElementById("f-base").value = p.base || "";
+      document.getElementById("f-topChart").value = p.topChart || "";
+      document.getElementById("f-structType").value = p.structType || "";
+      document.getElementById("f-minGroup").value = p.minGroup || "";
+      document.getElementById("f-maxGroup").value = p.maxGroup || "";
+      document.getElementById("f-education").value = p.education || "";
+      document.getElementById("f-experience").value = p.experience || "";
+      document.getElementById("f-insCode").value = p.insCode || "";
+      document.getElementById("f-insTitle").value = p.insTitle || "";
+      document.getElementById("f-holdingRank").value = p.holdingRank || "";
+      document.getElementById("f-mgmtRank").value = p.mgmtRank || "";
+      document.getElementById("f-jobNature").value = p.jobNature || "";
+      switchTab("positions");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function deletePosition(id) {
+      if (!confirm("آیا از حذف این سمت مطمئن هستید؟")) return;
+      positions = positions.filter(p => p.id !== id);
+      save();
+      renderPositionsList();
+      populateParentSelect();
+    }
+
+    function renderPositionsList() {
+      const q = (document.getElementById("search-pos")?.value || "").trim().toLowerCase();
+      const deptFilter = document.getElementById("filter-dept")?.value || "";
+      let list = positions;
+      if (deptFilter) list = list.filter(p => p.dept === deptFilter);
+      if (q) {
+        list = list.filter(p =>
+          (p.title || "").toLowerCase().includes(q) ||
+          (p.id || "").toLowerCase().includes(q) ||
+          (p.dept || "").toLowerCase().includes(q) ||
+          (p.unit || "").toLowerCase().includes(q) ||
+          (p.jobTitle || "").toLowerCase().includes(q) ||
+          (p.mgmtRank || "").toLowerCase().includes(q)
+        );
+      }
+      document.getElementById("pos-count").textContent = `(${list.length} از ${positions.length})`;
+      const container = document.getElementById("positions-list");
+      if (!list.length) {
+        container.innerHTML = `<div class="text-center text-slate-400 py-10">سمتی یافت نشد. از تب «ورود / خروجی فایل» فایل اکسل را وارد کنید.</div>`;
+        return;
+      }
+      // Virtual-ish: show max 300 for performance
+      const display = list.slice(0, 300);
+      container.innerHTML = display.map(p => {
+        const parent = positions.find(x => x.id === p.parentId);
+        return `
+          <div class="pos-row border border-slate-200 rounded-lg px-3 py-2 flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-medium text-sm">${escapeHtml(p.title)} <span class="text-slate-400 font-normal text-xs">${escapeHtml(p.id)}</span></div>
+              <div class="text-xs text-slate-500 mt-0.5">
+                ${p.dept ? escapeHtml(p.dept) : ""}${p.unit ? " › " + escapeHtml(p.unit) : ""}
+                ${p.mgmtRank ? " · <span class='text-slate-700'>" + escapeHtml(p.mgmtRank) + "</span>" : ""}
+                ${p.structType ? " · " + escapeHtml(p.structType) : ""}
+              </div>
+              ${parent ? `<div class="text-xs text-blue-600">↑ ${escapeHtml(parent.title)}</div>` : (!p.parentId ? `<div class="text-xs text-emerald-600">ریشه</div>` : `<div class="text-xs text-amber-600">والد: ${escapeHtml(p.parentId)}</div>`)}
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <button onclick="editPosition('${escapeAttr(p.id)}')" class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-white">ویرایش</button>
+              <button onclick="deletePosition('${escapeAttr(p.id)}')" class="text-xs px-2 py-1 border border-red-200 text-red-600 rounded hover:bg-red-50">حذف</button>
+            </div>
+          </div>
+        `;
+      }).join("") + (list.length > 300 ? `<div class="text-center text-xs text-slate-400 py-2">نمایش ۳۰۰ مورد اول از ${list.length} — جستجو را محدودتر کنید</div>` : "");
+    }
+
+    // ========== Tree — Virtual Scroll (Flattened List) ==========
+    let treeIndex = null;        // id -> position object
+    let childrenMap = null;      // id -> [childId, ...]
+    let parentMap = null;        // id -> parentId (for fast ancestor walk)
+    let rootIds = [];
+    let expandedSet = new Set();
+    let treeSearchQuery = "";
+    let flatList = [];           // visible rows: { id, depth, hasChildren }
+    let matchCache = null;       // id -> boolean (subtree match) during search
+
+    // Virtual scroll config
+    const VS = {
+      rowHeight: 52,             // base row height (px) without details
+      rowHeightDetails: 72,      // with details
+      overscan: 8,               // extra rows above/below viewport
+      viewport: null,
+      phantom: null,
+      window: null,
+    };
+
+    function currentRowHeight() {
+      return document.getElementById("show-details")?.checked ? VS.rowHeightDetails : VS.rowHeight;
+    }
+
+    function rebuildTreeData() {
+      treeIndex = {};
+      childrenMap = {};
+      parentMap = {};
+      rootIds = [];
+      matchCache = null;
+
+      const onlyTop = document.getElementById("only-top-chart")?.checked;
+      const deptFilter = document.getElementById("tree-dept-filter")?.value || "";
+
+      // Fast lookup map
+      const byId = {};
+      positions.forEach(p => { byId[p.id] = p; });
+
+      let source = positions;
+      if (onlyTop) source = positions.filter(p => p.topChart === "*" || !p.parentId);
+
+      if (deptFilter) {
+        const inDept = new Set();
+        source.forEach(p => { if (p.dept === deptFilter) inDept.add(p.id); });
+        const keep = new Set(inDept);
+        inDept.forEach(id => {
+          let cur = byId[id]?.parentId;
+          let guard = 0;
+          while (cur && guard++ < 20) {
+            keep.add(cur);
+            cur = byId[cur]?.parentId;
+          }
+        });
+        source = positions.filter(p => keep.has(p.id));
+      }
+
+      source.forEach(p => {
+        treeIndex[p.id] = p;
+        childrenMap[p.id] = [];
+        parentMap[p.id] = p.parentId && p.parentId !== p.id ? p.parentId : null;
+      });
+
+      source.forEach(p => {
+        const pid = p.parentId;
+        if (pid && pid !== p.id && treeIndex[pid]) {
+          childrenMap[pid].push(p.id);
+        } else {
+          rootIds.push(p.id);
+        }
+      });
+
+      Object.keys(childrenMap).forEach(id => {
+        childrenMap[id].sort((a, b) =>
+          (treeIndex[a]?.title || "").localeCompare(treeIndex[b]?.title || "", "fa")
+        );
+      });
+      rootIds.sort((a, b) =>
+        (treeIndex[a]?.title || "").localeCompare(treeIndex[b]?.title || "", "fa")
+      );
+
+      // Dept filter options (once)
+      const deptSel = document.getElementById("tree-dept-filter");
+      if (deptSel && deptSel.options.length <= 1) {
+        const depts = [...new Set(positions.map(p => p.dept).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, "fa"));
+        depts.forEach(d => {
+          const o = document.createElement("option");
+          o.value = d;
+          o.textContent = d;
+          deptSel.appendChild(o);
+        });
+      }
+    }
+
+    /** Direct text match (no subtree) */
+    function matchesSearch(id) {
+      if (!treeSearchQuery) return true;
+      const p = treeIndex[id];
+      if (!p) return false;
+      const q = treeSearchQuery;
+      // Pre-stored lowercase fields when available
+      const title = p._titleL || (p._titleL = (p.title || "").toLowerCase());
+      const pid = p._idL || (p._idL = (p.id || "").toLowerCase());
+      const unit = p._unitL || (p._unitL = (p.unit || "").toLowerCase());
+      const rank = p._rankL || (p._rankL = (p.mgmtRank || "").toLowerCase());
+      return title.includes(q) || pid.includes(q) || unit.includes(q) || rank.includes(q);
+    }
+
+    /**
+     * Precompute subtree-match for ALL nodes in one bottom-up-ish DFS.
+     * Result: matchCache is a Set of ids that should appear when searching.
+     * O(n) single pass — much faster than recursive checks during walk.
+     */
+    function precomputeMatchCache() {
+      matchCache = new Set();
+      if (!treeSearchQuery) return;
+
+      // Post-order: mark node if itself matches OR any descendant matches
+      const visiting = new Set();
+      function dfs(id) {
+        if (visiting.has(id)) return matchCache.has(id);
+        visiting.add(id);
+        let hit = matchesSearch(id);
+        const kids = childrenMap[id];
+        if (kids) {
+          for (let i = 0, len = kids.length; i < len; i++) {
+            if (dfs(kids[i])) hit = true;
+          }
+        }
+        if (hit) matchCache.add(id);
+        return hit;
+      }
+      for (let i = 0, len = rootIds.length; i < len; i++) {
+        dfs(rootIds[i]);
+      }
+    }
+
+    function hasMatchInSubtree(id) {
+      if (!treeSearchQuery) return true;
+      if (!matchCache) precomputeMatchCache();
+      return matchCache.has(id);
+    }
+
+    /**
+     * Full rebuild of flatList from roots.
+     * Reuses the same array to reduce GC pressure.
+     */
+    function buildFlatList() {
+      if (treeSearchQuery) {
+        precomputeMatchCache();
+      } else {
+        matchCache = null;
+      }
+
+      // Reuse array
+      flatList.length = 0;
+
+      const stack = []; // iterative DFS to avoid call-stack limits & reduce overhead
+      // push roots in reverse so first root is processed first
+      for (let i = rootIds.length - 1; i >= 0; i--) {
+        stack.push({ id: rootIds[i], depth: 0 });
+      }
+
+      while (stack.length) {
+        const { id, depth } = stack.pop();
+        if (treeSearchQuery && matchCache && !matchCache.has(id)) continue;
+
+        const kids = childrenMap[id];
+        const kidLen = kids ? kids.length : 0;
+
+        flatList.push({
+          id,
+          depth,
+          hasChildren: kidLen > 0,
+          childCount: kidLen
+        });
+
+        if (kidLen && expandedSet.has(id)) {
+          // push children in reverse for correct order
+          for (let i = kidLen - 1; i >= 0; i--) {
+            stack.push({ id: kids[i], depth: depth + 1 });
+          }
+        }
+      }
+    }
+
+    /**
+     * Incremental update: expand or collapse one node inside flatList
+     * without rebuilding the entire list. O(subtree size) instead of O(n).
+     */
+    function toggleInFlatList(id) {
+      // Find index of the node
+      let idx = -1;
+      for (let i = 0, len = flatList.length; i < len; i++) {
+        if (flatList[i].id === id) { idx = i; break; }
+      }
+      if (idx < 0) {
+        // fallback
+        buildFlatList();
+        return;
+      }
+
+      const row = flatList[idx];
+      if (!row.hasChildren) return;
+
+      if (expandedSet.has(id)) {
+        // Was collapsed → now expanded: insert children after idx
+        const toInsert = [];
+        const stack = [];
+        const kids = childrenMap[id] || [];
+        for (let i = kids.length - 1; i >= 0; i--) {
+          stack.push({ id: kids[i], depth: row.depth + 1 });
+        }
+        while (stack.length) {
+          const { id: cid, depth } = stack.pop();
+          if (treeSearchQuery && matchCache && !matchCache.has(cid)) continue;
+          const ckids = childrenMap[cid];
+          const ckLen = ckids ? ckids.length : 0;
+          toInsert.push({ id: cid, depth, hasChildren: ckLen > 0, childCount: ckLen });
+          if (ckLen && expandedSet.has(cid)) {
+            for (let i = ckLen - 1; i >= 0; i--) {
+              stack.push({ id: ckids[i], depth: depth + 1 });
+            }
+          }
+        }
+        if (toInsert.length) {
+          flatList.splice(idx + 1, 0, ...toInsert);
+        }
+      } else {
+        // Was expanded → now collapsed: remove all following rows with greater depth
+        const baseDepth = row.depth;
+        let end = idx + 1;
+        const len = flatList.length;
+        while (end < len && flatList[end].depth > baseDepth) end++;
+        if (end > idx + 1) {
+          flatList.splice(idx + 1, end - idx - 1);
+        }
+      }
+    }
+
+    function ensureVsElements() {
+      if (!VS.viewport) {
+        VS.viewport = document.getElementById("tree-viewport");
+        VS.phantom = document.getElementById("tree-phantom");
+        VS.window = document.getElementById("tree-window");
+        if (VS.viewport && !VS.viewport._vsBound) {
+          VS.viewport.addEventListener("scroll", onVirtualScroll, { passive: true });
+          VS.viewport._vsBound = true;
+        }
+      }
+    }
+
+    function onVirtualScroll() {
+      renderVirtualWindow();
+    }
+
+    function renderVirtualWindow() {
+      ensureVsElements();
+      if (!VS.viewport || !VS.window || !VS.phantom) return;
+
+      const rh = currentRowHeight();
+      const total = flatList.length;
+      const scrollTop = VS.viewport.scrollTop;
+      const viewH = VS.viewport.clientHeight;
+
+      // Empty state
+      if (total === 0) {
+        VS.phantom.style.height = "200px";
+        VS.window.style.transform = "translateY(0)";
+        VS.window.innerHTML = `<div class="text-center text-slate-400 py-16">هنوز سمتی تعریف نشده یا نتیجه‌ای یافت نشد.</div>`;
+        return;
+      }
+
+      const start = Math.max(0, Math.floor(scrollTop / rh) - VS.overscan);
+      const visibleCount = Math.ceil(viewH / rh) + VS.overscan * 2;
+      const end = Math.min(total, start + visibleCount);
+
+      VS.phantom.style.height = (total * rh) + "px";
+      VS.window.style.transform = `translateY(${start * rh}px)`;
+
+      const showDetails = document.getElementById("show-details")?.checked;
+      const frag = document.createDocumentFragment();
+
+      for (let i = start; i < end; i++) {
+        const row = flatList[i];
+        const p = treeIndex[row.id];
+        if (!p) continue;
+
+        const isExpanded = expandedSet.has(row.id);
+        const isMatch = treeSearchQuery && matchesSearch(row.id);
+
+        const el = document.createElement("div");
+        el.className = "flex items-stretch gap-1 px-2 border-b border-slate-100/80 hover:bg-blue-50/50";
+        el.style.height = rh + "px";
+        el.style.boxSizing = "border-box";
+        el.dataset.id = row.id;
+
+        // Indent + toggle
+        const indent = document.createElement("div");
+        indent.className = "flex items-center shrink-0";
+        indent.style.width = (row.depth * 18 + 28) + "px";
+        indent.style.paddingRight = "4px";
+        indent.style.justifyContent = "flex-end";
+
+        if (row.hasChildren) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-800 text-xs border border-slate-300 rounded bg-white hover:bg-slate-50";
+          btn.textContent = isExpanded ? "−" : "+";
+          btn.dataset.action = "toggle";
+          btn.dataset.id = row.id;
+          indent.appendChild(btn);
+        }
+        el.appendChild(indent);
+
+        // Content card
+        const card = document.createElement("div");
+        card.className = "flex-1 min-w-0 flex flex-col justify-center py-1" + (isMatch ? " bg-blue-50/60 rounded px-2" : "");
+
+        let titleHtml = `<div class="font-medium text-sm leading-tight truncate">${escapeHtml(p.title)}</div>`;
+        titleHtml += `<div class="text-[10px] text-slate-400 font-mono truncate">${escapeHtml(p.id)}`;
+        if (row.hasChildren) titleHtml += ` · ${row.childCount} زیرمجموعه`;
+        titleHtml += `</div>`;
+
+        if (showDetails) {
+          const bits = [];
+          if (p.dept || p.unit) bits.push(escapeHtml([p.dept, p.unit].filter(Boolean).join(" › ")));
+          if (p.mgmtRank) bits.push(`<span class="bg-slate-100 rounded px-1">${escapeHtml(p.mgmtRank)}</span>`);
+          if (p.base) bits.push(`<span class="bg-blue-50 text-blue-700 rounded px-1">پایه ${escapeHtml(p.base)}</span>`);
+          if (p.jobNature) bits.push(`<span class="bg-emerald-50 text-emerald-700 rounded px-1">${escapeHtml(p.jobNature)}</span>`);
+          if (bits.length) titleHtml += `<div class="text-[10px] text-slate-500 flex flex-wrap gap-1 mt-0.5">${bits.join(" ")}</div>`;
+        }
+
+        card.innerHTML = titleHtml;
+        el.appendChild(card);
+        frag.appendChild(el);
+      }
+
+      VS.window.innerHTML = "";
+      VS.window.appendChild(frag);
+    }
+
+    function renderTree() {
+      ensureVsElements();
+      if (!treeIndex) rebuildTreeData();
+      buildFlatList();
+
+      const stats = document.getElementById("tree-stats");
+      if (stats) {
+        stats.textContent = `${positions.length} سمت کل · ${rootIds.length} ریشه · ${flatList.length} ردیف قابل‌مشاهده · ${expandedSet.size} گره باز · Virtual Scroll`;
+      }
+
+      // Reset scroll on major rebuilds only if list is short; keep position otherwise
+      renderVirtualWindow();
+    }
+
+    function onTreeOptionsChange() {
+      rebuildTreeData();
+      // Keep expandedSet; just rebuild flat list
+      renderTree();
+    }
+
+    // Event delegation on viewport — incremental flatList update on toggle
+    document.addEventListener("click", function(e) {
+      const btn = e.target.closest("[data-action='toggle']");
+      if (!btn || !document.getElementById("tree-viewport")?.contains(btn)) return;
+
+      const id = btn.dataset.id;
+      if (!id) return;
+
+      const scrollTop = VS.viewport ? VS.viewport.scrollTop : 0;
+
+      if (expandedSet.has(id)) {
+        expandedSet.delete(id);
+        btn.textContent = "+";
+      } else {
+        expandedSet.add(id);
+        btn.textContent = "−";
+      }
+
+      // O(subtree) incremental update instead of full O(n) rebuild
+      toggleInFlatList(id);
+      renderVirtualWindow();
+
+      if (VS.viewport) VS.viewport.scrollTop = scrollTop;
+
+      const stats = document.getElementById("tree-stats");
+      if (stats) {
+        stats.textContent = `${positions.length} سمت کل · ${rootIds.length} ریشه · ${flatList.length} ردیف قابل‌مشاهده · ${expandedSet.size} گره باز · Virtual Scroll`;
+      }
+    });
+
+    function expandLevel(maxDepth) {
+      if (!treeIndex) rebuildTreeData();
+      expandedSet.clear();
+      function walk(id, depth) {
+        if (depth < maxDepth && (childrenMap[id] || []).length) {
+          expandedSet.add(id);
+          (childrenMap[id] || []).forEach(c => walk(c, depth + 1));
+        }
+      }
+      rootIds.forEach(r => walk(r, 0));
+      renderTree();
+      if (VS.viewport) VS.viewport.scrollTop = 0;
+    }
+
+    function collapseAll() {
+      expandedSet.clear();
+      renderTree();
+      if (VS.viewport) VS.viewport.scrollTop = 0;
+    }
+
+    let searchTimer = null;
+    function onTreeSearch() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        treeSearchQuery = (document.getElementById("tree-search")?.value || "").trim().toLowerCase();
+        matchCache = null;
+        if (treeSearchQuery) {
+          expandedSet.clear();
+          function expandMatches(id) {
+            if (hasMatchInSubtree(id)) {
+              const kids = childrenMap[id] || [];
+              if (kids.some(c => hasMatchInSubtree(c))) expandedSet.add(id);
+              kids.forEach(expandMatches);
+            }
+          }
+          if (!treeIndex) rebuildTreeData();
+          rootIds.forEach(expandMatches);
+        }
+        renderTree();
+        if (VS.viewport) VS.viewport.scrollTop = 0;
+      }, 180);
+    }
+
+    // ========== Excel Import (Full File) ==========
+    function handleDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove("border-blue-400", "bg-blue-100");
+      const file = e.dataTransfer.files[0];
+      if (file) processExcelFile(file);
+    }
+
+    function importExcel(ev) {
+      const file = ev.target.files[0];
+      if (file) processExcelFile(file);
+      ev.target.value = "";
+    }
+
+    function processExcelFile(file) {
+      if (!file.name.match(/\.xlsx?$/i)) {
+        alert("لطفاً فایل اکسل (.xlsx یا .xls) انتخاب کنید.");
+        return;
+      }
+      showLoading("در حال خواندن فایل اکسل («" + file.name + "»)...");
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array", cellDates: false });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+
+          showLoading("در حال تبدیل " + rows.length + " ردیف...");
+
+          // Flexible header mapping (handles trailing spaces & Arabic/Persian variants)
+          const headerMap = {
+            id: ["شماره سمت", "شمارهسمت", "کد سمت"],
+            title: ["عنوان سمت", "عنوان سمت ", "عنوانسمت", "سمت"],
+            parentId: ["شماره سمت موقعیت بالاتر", "شماره سمت موقعیت بالاتر", "سمت بالاتر", "والد"],
+            dept: ["امور", "دپارتمان", "معاونت"],
+            unit: ["واحد"],
+            jobTitle: ["عنوان شغل", "شغل"],
+            base: ["پایه سمت", "پایه"],
+            topChart: ["تاپ چارت", "تاپ‌چارت", "top chart"],
+            structType: ["نوع ساختار", "نوعساختار"],
+            minGroup: ["حداقل گروه", "حداقلگروه"],
+            maxGroup: ["حداكثرگروه", "حداکثر گروه", "حداکثرگروه"],
+            education: ["شرایط احراز (رشته تحصیلی)", "شرایط احراز", "رشته تحصیلی"],
+            experience: ["تجربه"],
+            insCode: ["کد بیمه", "کدبیمه"],
+            insTitle: ["عنوان بیمه", "عنوانبیمه"],
+            holdingRank: ["رده هلدینگ", "ردههلدینگ"],
+            mgmtRank: ["رده مدیریت", "ردهمدیریت"],
+            jobNature: ["ماهیت شغل", "ماهیتشغل"],
+          };
+
+          function findKey(row, candidates) {
+            for (const c of candidates) {
+              if (row.hasOwnProperty(c)) return c;
+              // try trimmed / normalized
+              for (const k of Object.keys(row)) {
+                if (k.trim() === c.trim() || k.replace(/\s+/g, "") === c.replace(/\s+/g, "")) return k;
+              }
+            }
+            return null;
+          }
+
+          const newPositions = [];
+          const seenIds = new Set();
+          let skipped = 0;
+
+          for (const row of rows) {
+            let idKey = findKey(row, headerMap.id);
+            let id = idKey ? String(row[idKey] || "").trim() : "";
+            if (!id) { skipped++; continue; }
+            if (seenIds.has(id)) { skipped++; continue; } // skip duplicate ids
+            seenIds.add(id);
+
+            const get = (field) => {
+              const k = findKey(row, headerMap[field]);
+              return k ? String(row[k] ?? "").trim() : "";
+            };
+
+            let parentId = get("parentId");
+            // Self-reference = root
+            if (parentId === id) parentId = "";
+
+            newPositions.push({
+              id,
+              title: get("title") || id,
+              parentId,
+              dept: get("dept"),
+              unit: get("unit"),
+              jobTitle: get("jobTitle"),
+              base: get("base"),
+              topChart: get("topChart"),
+              structType: get("structType"),
+              minGroup: get("minGroup"),
+              maxGroup: get("maxGroup"),
+              education: get("education"),
+              experience: get("experience"),
+              insCode: get("insCode"),
+              insTitle: get("insTitle"),
+              holdingRank: get("holdingRank"),
+              mgmtRank: get("mgmtRank"),
+              jobNature: get("jobNature"),
+            });
+          }
+
+          positions = newPositions;
+          // Reset tree state for clean rebuild
+          expandedSet.clear();
+          treeIndex = null;
+          childrenMap = null;
+          parentMap = null;
+          rootIds = [];
+          flatList = [];
+          matchCache = null;
+          treeSearchQuery = "";
+          const ts = document.getElementById("tree-search");
+          if (ts) ts.value = "";
+          save();
+          hideLoading();
+
+          const resultEl = document.getElementById("import-result");
+          resultEl.classList.remove("hidden");
+          resultEl.innerHTML = `
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-900">
+              <div class="font-semibold mb-1">✓ ورود با موفقیت انجام شد</div>
+              <div>${newPositions.length} سمت وارد شد${skipped ? " (" + skipped + " ردیف رد شد)" : ""}.</div>
+              <div class="mt-2 flex gap-2">
+                <button onclick="switchTab('tree')" class="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs hover:bg-emerald-700">مشاهده درخت</button>
+                <button onclick="switchTab('positions')" class="px-3 py-1.5 border border-emerald-300 rounded text-xs hover:bg-emerald-100">مشاهده فهرست</button>
+              </div>
+            </div>
+          `;
+          populateParentSelect();
+          populateDeptFilter();
+        } catch (err) {
+          hideLoading();
+          console.error(err);
+          alert("خطا در پردازش فایل اکسل:\n" + err.message);
+        }
+      };
+      reader.onerror = () => {
+        hideLoading();
+        alert("خطا در خواندن فایل.");
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // ========== JSON Import / Export ==========
+    function exportJSON() {
+      const data = { fields, positions, exportedAt: new Date().toISOString(), count: positions.length };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "org-structure-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+    }
+
+    function importJSON(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (data.positions) positions = data.positions;
+          if (data.fields) fields = data.fields;
+          save();
+          renderFields();
+          populateParentSelect();
+          populateDeptFilter();
+          renderPositionsList();
+          alert("داده‌ها وارد شدند: " + positions.length + " سمت");
+        } catch (err) {
+          alert("خطا: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function loadSampleData() {
+      if (positions.length && !confirm("داده‌های فعلی جایگزین می‌شوند. ادامه؟")) return;
+      positions = structuredClone(SAMPLE_DATA);
+      save();
+      populateParentSelect();
+      populateDeptFilter();
+      renderPositionsList();
+      alert("نمونه کوچک بارگذاری شد.");
+    }
+
+    // ========== Utils ==========
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function escapeAttr(s) {
+      return String(s ?? "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    }
+
+    // Init
+    renderFields();
+    updateStatus();
+    if (positions.length) {
+      populateParentSelect();
+      populateDeptFilter();
+    }
+  </script>
+</body>
+</html>
