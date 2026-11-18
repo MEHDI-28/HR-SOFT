@@ -1,6 +1,10 @@
-# HR-SOFT Package Manifest
+# HR-SOFT Archive Lineage Manifest
 
-Archive lineage: HR_SOFT_Complete_Design_Archive_v3.4.zip
+**Scope:** This manifest records the file inventory and SHA-256 hashes associated with the archive lineage `HR_SOFT_Complete_Design_Archive_v3.4.zip`.
+
+**Important:** This is an archive-lineage manifest, not a complete inventory of the v3.5 Git synchronization package, the current Git branch, or Pull Request #1. Files added separately for v3.5 synchronization and analysis may therefore not appear in this table. Paths, byte counts, and hashes below describe the referenced archive lineage; they must not be interpreted as a verification of the current PR tree.
+
+Archive lineage: `HR_SOFT_Complete_Design_Archive_v3.4.zip`
 Extension: Stage 17 / Gate 0 read-only inventory pack
 Hash algorithm: SHA-256
 
