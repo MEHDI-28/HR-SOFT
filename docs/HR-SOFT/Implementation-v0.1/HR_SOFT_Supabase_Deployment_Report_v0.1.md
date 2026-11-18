@@ -57,6 +57,8 @@
 
 این آزمون، آزمون یکپارچه کامل برنامه یا pgTAP نیست؛ منطق SQL و مسیرهای اصلی resolver را بررسی می‌کند.
 
+**بازبینی مجدد در ?? نوامبر ????:** مسیر منفی resolver با JWT آزمایشی فاقد app_users دوباره اجرا شد و نتیجه APP_USER_INACTIVE داد. تابع hr_session_status() نیز برای هویت آزمایشی is_authenticated=true و is_provisioned=false برگرداند. شمار Auth users، Tenant، Company و app_users همچنان صفر است. آزمون مثبت bootstrap در این بازبینی دوباره اجرا نشد.
+
 ## ۶. راه‌اندازی مدیر اولیه
 
 صفحه auth.html امکان ثبت‌نام/ورود و تکمیل bootstrap یک‌باره را فراهم می‌کند.
