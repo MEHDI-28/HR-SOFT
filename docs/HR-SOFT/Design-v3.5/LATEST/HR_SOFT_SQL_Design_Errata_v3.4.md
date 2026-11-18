@@ -20,13 +20,22 @@
 ## 2. خطاهای ساختاری در proposal v0.4 (امنیت کاربر)
 
 ### 2.1. Bulletin FK
-`bulletin_acknowledgements` به `(tenant_id, bulletin_id)` ارجاع می‌دهد؛ پس `bulletins` باید `UNIQUE(tenant_id,id)` داشته باشد. این unique در proposal اولیه وجود نداشت و باید اضافه شود.
+`bulletin_acknowledgements` به `(tenant_id, bulletin_id)` ارجاع می‌دهد؛ پس `bulletins` باید `UNIQUE(tenant_id,id)` داشته باشد. این unique در proposal اولیه وجود نداشت. در شاخه جاری، قید در تعریف جدول `bulletins` و پیش از ایجاد جدول acknowledgement اضافه شد. ایندکس متناظر در correction v0.6 اکنون redundant است، اما در صورت حفظ باید با نام و وضعیت schema مقصد تطبیق داده شود. اجرای واقعی Migration v0.4 هنوز لازم است.
 
 ### 2.2. Default group/system consistency
 `user_default_groups` در نسخه اولیه فقط tenant و group را enforce می‌کرد و تضمین نمی‌کرد `group_id` متعلق به همان `system_id` باشد. باید unique composite روی `user_groups(tenant_id, system_id, id)` و FK مرکب استفاده شود.
 
 ### 2.3. IP policy semantics
 باید قاعده allowlist فعال، deny precedence، trusted proxy و حالت بدون allowlist در سطح Tenant صریح و آزمون‌پذیر باشد. صرف ذخیره CIDR، enforcement ایجاد نمی‌کند.
+
+### 2.4. Group permission/system consistency
+در baseline، `group_permission_rules` گروه و permission را جداگانه reference می‌کند و هم‌سیستمی بودن آن‌ها enforce نمی‌شود. Stage 18 proposal، `system_id` را از گروه backfill می‌کند و FK مرکب به گروه و permission همان system می‌افزاید. پیش از VALIDATE باید query ناسازگاری صفر ردیف برگرداند.
+
+### 2.5. Temporary access approval
+در baseline، `temporary_access.scope_id` و `approved_by` nullable هستند و `approved_at` وجود ندارد. Stage 18 proposal برای دسترسی tenant-wide با scope خالی، ثبت جفت approver/approval time را اجباری می‌کند. مجاز بودن approver همچنان باید در command سمت سرور کنترل شود.
+
+### 2.6. Login/access event immutability
+Migration مرحله 13 append-only trigger برای `user_login_events` و `user_access_events` را به TODO واگذار کرده بود. Stage 18 proposal triggerهای جلوگیری از UPDATE/DELETE را با تابع موجود Stage 5 اضافه می‌کند؛ این تغییر باید با roleهای واقعی و RLS در محیط آزمایشی آزمون شود.
 
 ## 3. Trigger function grants
 

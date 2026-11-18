@@ -125,6 +125,7 @@ create table if not exists hr_notify.bulletins (
   created_at timestamptz not null default now(),
   created_by uuid not null,
   archived_at timestamptz,
+  unique (tenant_id, id),
   foreign key (tenant_id, created_by)
     references hr_security.app_users(tenant_id, id),
   check (ends_at is null or ends_at > starts_at),

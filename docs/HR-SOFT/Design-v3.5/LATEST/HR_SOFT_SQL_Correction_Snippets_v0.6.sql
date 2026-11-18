@@ -5,6 +5,10 @@
 begin;
 
 -- A) Bulletin composite FK target key.
+-- The corrected Stage 13 v0.4 now declares UNIQUE(tenant_id,id) before
+-- creating bulletin_acknowledgements. Use this fallback ONLY for an older
+-- pre-existing schema where that composite key is genuinely absent; otherwise
+-- it creates a redundant unique index under a second name.
 create unique index if not exists uq_bulletins_tenant_id
   on hr_notify.bulletins(tenant_id, id);
 
