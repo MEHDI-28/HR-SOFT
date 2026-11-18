@@ -1,58 +1,61 @@
-<<<<<<< HEAD
-# مدیریت ساختار سازمانی
+# HR-SOFT — سامانه منابع انسانی و ساختار سازمانی
 
-ابزار تحت‌وب برای تعریف فیلدها، مدیریت سمت‌ها و نمایش ساختار درختی سازمانی.
+این مخزن، طراحی و پیاده‌سازی تدریجی HR-SOFT را در کنار رابط اولیه مدیریت ساختار سازمانی (Org-Ch) نگهداری می‌کند.
 
-## امکانات
+## وضعیت فعلی
 
-- **تنظیمات و تعاریف**: هر فیلد با شناسه، عنوان و توضیحات جداگانه
-- **مدیریت سمت‌ها**: افزودن / ویرایش / حذف، جستجو و فیلتر بر اساس امور
-- **ساختار درختی**: Virtual Scroll + لیست تخت بهینه‌شده برای حدود ۲۰۰۰ سمت
-- **ورود مستقیم اکسل**: پشتیبانی از فایل `.xlsx` ساختار سازمانی
-- **خروجی JSON**: ذخیره و بازیابی ساختار
+- پایگاه داده توسعه در Supabase با نام **Org-Ch** آماده شده است.
+- شناسه پروژه: `xdjhshktjtevusigqzya` — منطقه: `us-east-2` — PostgreSQL 17.
+- Five Supabase migrations have been applied to the Org-Ch development project.
+- 57 HR-SOFT domain tables have been created; they currently contain no operational data.
+- همه جدول‌های دامنه RLS فعال و اجباری دارند. سیاست پیش‌فرض برای داده‌های کسب‌وکار **عدم دسترسی** است.
+- هیچ Tenant، شرکت، کاربر HR، گروه یا مجوزی به‌صورت حدسی ساخته نشده است.
+- `index.html` هنوز رابط اولیه Org-Ch با ذخیره‌سازی `localStorage` است و هنوز به API داده‌ای HR-SOFT متصل نشده است.
+- auth.html supports Supabase sign-in/sign-up and the one-time first-admin bootstrap; signup alone grants no HR data access.
 
-## نحوه استفاده
+## اجرای رابط در ویندوز
 
-1. فایل `index.html` را در مرورگر باز کنید (یا با یک سرور محلی سرو کنید).
-2. از تب **ورود / خروجی فایل** فایل اکسل ساختار سازمانی را بارگذاری کنید.
-3. در تب **ساختار درختی** سلسله‌مراتب را مشاهده و جستجو کنید.
-4. در تب **تنظیمات و تعاریف** فیلدها را سفارشی کنید.
+از پوشه اصلی مخزن:
 
-### اجرای محلی با سرور ساده
-
-```bash
-# Python
+```powershell
 python -m http.server 8080
-
-# یا Node
-npx serve .
 ```
 
-سپس در مرورگر: `http://localhost:8080`
+- رابط ساختار سازمانی: http://localhost:8080/
 
-## ساختار پروژه
+## تنظیمات Supabase در مرورگر
 
+1. فایل `supabase-config.example.js` را به `supabase-config.js` کپی کنید.
+2. URL و Publishable Key پروژه را در فایل محلی قرار دهید.
+
+## پایگاه داده و Migrationها
+
+پیکربندی CLI در `supabase/config.toml` قرار دارد. Migrationها:
+
+1. `20261118201829_hr_soft_foundation.sql` — مدل پایه و تکمیلی، محدودیت‌های چندشرکتی، تاریخچه، RLS و default-deny.
+2. `20261118202031_hr_soft_performance_security_hardening.sql` — انتقال citext به schema داخلی، اصلاح تابع وضعیت نشست، ایندکس FKها و حذف ایندکس‌های تکراری.
+3. `20261118202503_hr_soft_api_schema_lockdown.sql` - Restricts PostgREST to public and graphql_public.
+4. `20261118203447_hr_soft_bootstrap_permission_resolver.sql` - Adds the internal permission resolver and one-time first-admin bootstrap.
+5. `20261118203712_hr_soft_bootstrap_internalize.sql` - Moves privileged bootstrap implementation to the private schema; public wrapper is SECURITY INVOKER.
+
+برای همگام‌سازی بعدی با Supabase CLI:
+
+```powershell
+supabase login
+supabase link --project-ref xdjhshktjtevusigqzya
+supabase db push --remote --dry-run
+# After reviewing the exact pending migration list:
+supabase db push --remote
 ```
-Org-Ch/
-├── index.html      # اپلیکیشن کامل (تک‌فایلی)
-├── README.md
-└── .gitignore
-```
 
-## نکات
+## مرزهای امنیتی فعلی
 
-- داده‌ها در `localStorage` مرورگر ذخیره می‌شوند.
-- برای داده‌های سازمانی حساس، فایل اکسل را داخل مخزن Git قرار ندهید.
-- مرورگرهای مدرن (Chrome، Firefox، Edge، Safari) پشتیبانی می‌شوند.
+- فقط schemaهای `public` و `graphql_public` در Data API قابل مشاهده‌اند؛ schemaهای `hr_*` عمداً expose نشده‌اند.
+- جدول‌های حساس، مالی، پرسنلی، فایل، ممیزی و گردش کار مستقیماً از مرورگر قابل خواندن/نوشتن نیستند.
+- تابع `public.hr_session_status()` فقط وضعیت احراز هویت و وجود حساب داخلی فعال را برمی‌گرداند.
+- The internal permission resolver v2.4.1 and one-time first-admin bootstrap are installed; business-data RPCs and private Storage remain pending.
+- Supabase reports 53 RLS-enabled tables without policies. This is intentional fail-closed behavior until permission-aware business APIs are complete.
 
-## مخزن
+## اسناد طراحی
 
-https://github.com/mehdi-28/Org-Ch
-
-## نویسنده
-
-[mehdi-28](https://github.com/mehdi-28)
-=======
-# Org-St
-ORGANIZATION CHART
->>>>>>> 1f67804377a24d74ade7f5fd2ae18c5af74a3ca4
+اسناد معماری، ERD، امنیت، تصمیم‌ها و مراحل طراحی در `docs/HR-SOFT/` قرار دارند. فایل‌های SQL طراحی تاریخی، به‌تنهایی مجوز اجرا نیستند؛ Migrationهای قابل استقرار فقط در `supabase/migrations/` نگهداری می‌شوند.

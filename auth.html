@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ورود به HR-SOFT</title>
+  <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.003/Vazirmatn-font-face.css" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f6f8;color:#17212b;font-family:Vazirmatn,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
+    main{width:min(100%,460px);background:#fff;border:1px solid #e1e7ec;border-radius:18px;padding:28px;box-shadow:0 12px 36px #12283a12}
+    h1{font-size:22px;margin:0 0 6px}p{color:#64748b;line-height:1.8;margin:0 0 18px;font-size:14px}
+    label{display:block;font-size:13px;margin:14px 0 6px}input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;direction:ltr;text-align:left}
+    button{width:100%;border:0;border-radius:9px;padding:12px;font:inherit;font-weight:600;cursor:pointer;margin-top:14px;background:#14532d;color:#fff}
+    button.secondary{background:#e2e8f0;color:#1e293b}button:disabled{opacity:.55;cursor:wait}
+    #status{margin-top:18px;padding:12px;border-radius:9px;background:#f1f5f9;color:#334155;font-size:13px;line-height:1.9;white-space:pre-wrap}
+    .small{font-size:12px;color:#64748b;margin-top:16px}a{color:#166534}
+  </style>
+</head>
+<body>
+<main>
+  <h1>ورود به HR-SOFT</h1>
+  <p>احراز هویت از طریق Supabase انجام می‌شود. داشتن حساب ورود به‌تنهایی به معنی تخصیص دسترسی به اطلاعات سازمانی نیست.</p>
+  <form id="login-form">
+    <label for="email">ایمیل</label>
+    <input id="email" type="email" autocomplete="username" required />
+    <label for="password">گذرواژه</label>
+    <input id="password" type="password" autocomplete="current-password" minlength="8" required />
+    <button id="login-btn" type="submit">ورود</button>
+  </form>
+  <button id="signup-btn" class="secondary" type="button">ایجاد حساب آزمایشی</button>
+  <form id="bootstrap-form" hidden>
+    <p>پس از ورود، برای ساخت اولین مدیر و فضای سازمانی، توکن یک‌بارمصرف را وارد کنید. مقادیر نام سازمان و شرکت قابل تغییرند.</p>
+    <label for="bootstrap-token">توکن راه‌اندازی یک‌بارمصرف</label>
+    <input id="bootstrap-token" type="password" autocomplete="off" minlength="32" required />
+    <label for="tenant-key">شناسه کوتاه سازمان (Tenant Key)</label>
+    <input id="tenant-key" value="org-ch" pattern="[a-z0-9][a-z0-9_-]{2,62}" required />
+    <label for="tenant-name">نام سازمان</label>
+    <input id="tenant-name" value="Org-Ch" minlength="2" maxlength="160" required />
+    <label for="company-code">کد شرکت</label>
+    <input id="company-code" value="ORGCH" pattern="[A-Z0-9][A-Z0-9_-]{1,31}" required />
+    <label for="company-name">نام شرکت</label>
+    <input id="company-name" value="Org-Ch" minlength="2" maxlength="160" required />
+    <button id="bootstrap-btn" type="submit">راه‌اندازی مدیر اولیه</button>
+  </form>
+
+  <button id="logout-btn" class="secondary" type="button" hidden>خروج از حساب</button>
+  <div id="status" role="status" aria-live="polite">در انتظار اتصال به Supabase…</div>
+  <div class="small">این صفحه فقط ورود و وضعیت حساب را آزمایش می‌کند؛ API داده‌های سازمانی هنوز به رابط متصل نشده است.</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script>
+<script src="./supabase-config.js"></script>
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const signupBtn = document.getElementById('signup-btn');
+  const loginForm = document.getElementById('login-form');
+  const bootstrapForm = document.getElementById('bootstrap-form');
+  const bootstrapBtn = document.getElementById('bootstrap-btn');
+  const cfg = window.HR_SUPABASE_CONFIG;
+  if (!window.supabase || !cfg?.url || !cfg?.publishableKey || cfg.publishableKey.includes('REPLACE')) {
+    statusEl.textContent = 'تنظیمات Supabase کامل نیست. فایل supabase-config.js را از روی نمونه بسازید و URL و Publishable Key را وارد کنید.';
+    loginBtn.disabled = signupBtn.disabled = true;
+    return;
+  }
+  const client = window.supabase.createClient(cfg.url, cfg.publishableKey);
+  async function refreshStatus() {
+    const { data: { session } } = await client.auth.getSession();
+    logoutBtn.hidden = !session;
+    if (!session) { statusEl.textContent = 'به Supabase متصل شد. برای ادامه وارد شوید یا حساب آزمایشی بسازید.'; return; }
+    const { data, error } = await client.rpc('hr_session_status');
+    if (error) { statusEl.textContent = 'ورود انجام شد، اما بررسی وضعیت حساب داخلی ناموفق بود: ' + error.message; return; }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.is_provisioned) {
+      statusEl.textContent = 'حساب ورود فعال است و به حساب داخلی HR-SOFT متصل شده است. دسترسی داده‌ای تا تکمیل API و مجوزها همچنان محدود است.';
+    } else {
+      statusEl.textContent = 'احراز هویت موفق است؛ اما این حساب هنوز به Tenant و حساب داخلی HR-SOFT متصل نشده است. هیچ داده سازمانی در دسترس نیست.';
+    }
+  }
+  document.getElementById('login-form').addEventListener('submit', async (event) => {
+    event.preventDefault(); loginBtn.disabled = true;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const { error } = await client.auth.signInWithPassword({ email, password });
+    statusEl.textContent = error ? 'ورود ناموفق: ' + error.message : 'ورود موفق؛ در حال بررسی حساب…';
+    await refreshStatus(); loginBtn.disabled = false;
+  });
+  signupBtn.addEventListener('click', async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    if (!email || password.length < 8) { statusEl.textContent = 'ابتدا ایمیل را وارد کنید و گذرواژه حداقل ۸ کاراکتری تعیین کنید.'; return; }
+    signupBtn.disabled = true;
+    const { data, error } = await client.auth.signUp({ email, password });
+    statusEl.textContent = error ? 'ثبت‌نام ناموفق: ' + error.message : (data.session ? 'حساب ساخته شد؛ وضعیت دسترسی در حال بررسی است.' : 'درخواست ثبت‌نام ثبت شد. اگر تأیید ایمیل فعال باشد، ایمیل خود را بررسی کنید.');
+    if (error || !data?.session) { signupBtn.disabled = false; return; }
+    await refreshStatus(); signupBtn.disabled = false;
+  });
+
+  bootstrapForm.addEventListener('submit', async (event) => {
+    event.preventDefault(); bootstrapBtn.disabled = true;
+    const args = {
+      p_token: document.getElementById('bootstrap-token').value.trim(),
+      p_tenant_key: document.getElementById('tenant-key').value.trim(),
+      p_tenant_name: document.getElementById('tenant-name').value.trim(),
+      p_company_code: document.getElementById('company-code').value.trim(),
+      p_company_name: document.getElementById('company-name').value.trim()
+    };
+    const { data, error } = await client.rpc('hr_bootstrap_first_admin', args);
+    if (error) {
+      statusEl.textContent = 'راه‌اندازی انجام نشد: ' + error.message;
+    } else {
+      document.getElementById('bootstrap-token').value = '';
+      statusEl.textContent = 'مدیر اولیه و فضای سازمانی ساخته شد. مجوزهای حساس و مدیریت کاتالوگ مجوزها عمداً به‌صورت پیش‌فرض اعطا نشده‌اند.';
+      await refreshStatus();
+    }
+    bootstrapBtn.disabled = false;
+  });
+  logoutBtn.addEventListener('click', async () => { const { error } = await client.auth.signOut(); statusEl.textContent = error ? error.message : 'از حساب خارج شدید.'; await refreshStatus(); });
+  client.auth.onAuthStateChange(() => { refreshStatus(); });
+  refreshStatus();
+})();
+</script>
+</body>
+</html>
