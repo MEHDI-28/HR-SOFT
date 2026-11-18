@@ -68,13 +68,18 @@
   async function refreshStatus() {
     const { data: { session } } = await client.auth.getSession();
     logoutBtn.hidden = !session;
+    loginForm.hidden = !!session;
+    signupBtn.hidden = !!session;
+    bootstrapForm.hidden = !session;
     if (!session) { statusEl.textContent = 'به Supabase متصل شد. برای ادامه وارد شوید یا حساب آزمایشی بسازید.'; return; }
     const { data, error } = await client.rpc('hr_session_status');
     if (error) { statusEl.textContent = 'ورود انجام شد، اما بررسی وضعیت حساب داخلی ناموفق بود: ' + error.message; return; }
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.is_provisioned) {
+      bootstrapForm.hidden = true;
       statusEl.textContent = 'حساب ورود فعال است و به حساب داخلی HR-SOFT متصل شده است. دسترسی داده‌ای تا تکمیل API و مجوزها همچنان محدود است.';
     } else {
+      bootstrapForm.hidden = false;
       statusEl.textContent = 'احراز هویت موفق است؛ اما این حساب هنوز به Tenant و حساب داخلی HR-SOFT متصل نشده است. هیچ داده سازمانی در دسترس نیست.';
     }
   }
