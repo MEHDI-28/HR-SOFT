@@ -19,7 +19,7 @@
 ```mermaid
 erDiagram
     COMPANIES ||--o{ ORGANIZATIONS : "دارای سازمان"
-    COMPANIES ||--o{ EMPLOYEES : "دارای پرونده پرسنلی"
+    COMPANIES ||--o{ PERSONNEL_RECORDS : "دارای پرونده پرسنلی"
     COMPANIES ||--o{ ORG_LAYERS : "دامنه وابستگی نیازمند تصمیم"
     ORG_LAYERS ||--o{ ORGANIZATIONS : "طبقه‌بندی احتمالی"
     ORGANIZATIONS ||--o{ ORGANIZATIONS : "زیرسازمان"
@@ -29,8 +29,8 @@ erDiagram
     ORG_POSITION_TYPES ||--o{ ORG_POSITIONS : "نوع موقعیت"
     JOB_POSITIONS ||--o{ ORG_POSITIONS : "تعریف سمت"
     ORG_POSITIONS ||--o{ ORG_POSITIONS : "مافوق مستقیم"
-    PERSONS ||--o| EMPLOYEES : "هویت پرسنلی"
-    EMPLOYEES ||--o{ POSITION_ASSIGNMENTS : "سوابق انتصاب"
+    PERSONS ||--o{ PERSONNEL_RECORDS : "سوابق پرسنلی در طول زمان"
+    PERSONNEL_RECORDS ||--o{ POSITION_ASSIGNMENTS : "سوابق انتصاب"
     ORG_POSITIONS ||--o{ POSITION_ASSIGNMENTS : "متصدیان در زمان"
     ORG_POSITIONS ||--o{ POSITION_SUCCESSIONS : "جانشینی"
     PERSONS ||--o{ POSITION_SUCCESSIONS : "فرد جانشین"
@@ -41,6 +41,8 @@ erDiagram
 ```
 
 > رابطه شرکت با لایه سازمانی در ERD صرفاً یک گزینه طراحی است؛ سند مادر ساختار چندشرکتی و لایه‌های سازمانی را تأیید می‌کند، اما دامنه دقیق تعریف لایه‌ها را هنوز مشخص نکرده است.
+>
+> **قاعده شخص و پرونده پرسنلی:** مطابق مدل تکمیلی مرحله چهاردهم و Master نسخه 3.4، یک شخص می‌تواند در طول زمان چند پرونده پرسنلی داشته باشد؛ هر پرونده فقط به یک شرکت تعلق دارد. این رابطه به‌تنهایی مجاز بودن اشتغال هم‌زمان در چند شرکت را اثبات نمی‌کند؛ آن سناریو و قواعد هم‌پوشانی باید جداگانه تعیین شوند.
 
 ## ۳. فرهنگ داده پیشنهادی
 
@@ -64,8 +66,8 @@ erDiagram
 | `job_positions` | `id`، `title`، `job_description`، `responsibilities`، `authorities`، `qualification_requirements` | مشخصات سمت شغلی در سند مادر به‌عنوان تصمیم معماری تأییدشده آمده است |
 | `org_positions` | `id`، `org_unit_id`، `job_position_id`، `position_type_id`، `parent_org_position_id`، `affairs_office_id`، `position_status_id`، `display_flag` | چارت به سمت، واحد اجرایی، موقعیت بالاتر، موقعیت سازمانی اجرایی و امور/دفتر متصل است؛ تطبیق دقیق فیلدها نیازمند مشاهده صفحه است |
 | `persons` | `id`، فیلدهای هویتی پس از تحلیل صفحه شخص | وجود صفحه «شخص» و ارتباط کاربر با شخص مشاهده شده؛ جزئیات هویتی در سند فعلی نیست |
-| `employees` | `id`، `person_id`، `company_id`، `employee_number`، `employment_status` | هر پرسنل به یک شرکت تعلق دارد؛ سایر فیلدها تا تحلیل ماژول پرسنلی باز هستند |
-| `position_assignments` | `id`، `org_position_id`، `employee_id`، `valid_from`، `valid_to`، `assignment_type`، `created_by` | اتصال فرد به سمت و تاریخچه انتصاب لازم است؛ نام و جزئیات فیلدها پیشنهاد طراحی‌اند |
+| `personnel_records` | `id`، `person_id`، `company_id`، `employee_number`، `employment_status` | هر پرونده پرسنلی به یک شرکت تعلق دارد؛ یک شخص می‌تواند در طول زمان چند پرونده پرسنلی داشته باشد؛ سایر فیلدها تا تحلیل ماژول پرسنلی باز هستند |
+| `position_assignments` | `id`، `org_position_id`، `personnel_record_id`، `valid_from`، `valid_to`، `assignment_type`، `created_by` | اتصال پرونده پرسنلی به جایگاه و تاریخچه انتصاب لازم است؛ نام و جزئیات فیلدها پیشنهاد طراحی‌اند |
 | `position_successions` | `id`، `org_position_id`، `person_id` یا `employee_id`، `successor_type`، `priority`، `valid_from`، `valid_to`، `reason` | جانشین اصلی/موقت/احتمالی، اولویت، تاریخ و علت در سند مادر تأیید شده‌اند |
 | `org_relationships` | `id`، `source_org_position_id`، `target_org_position_id`، `relationship_type`، `valid_from`، `valid_to` | روابط نظارتی، مشاوره‌ای و وظیفه‌ای؛ جدا از سلسله‌مراتب اصلی |
 | `job_position_duties` | `job_position_id`، `duty_id`، `sort_order` | جدول واسط پیشنهادی برای اتصال چند وظیفه به سمت؛ کاردینالیتی دقیق باید بررسی شود |
