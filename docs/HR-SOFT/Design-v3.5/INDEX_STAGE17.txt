@@ -1,0 +1,6 @@
+HR-SOFT Complete Design Archive v3.5
+- Includes all contents of v3.4 unchanged.
+- Adds Stage 17 Gate 0 read-only database inventory SQL, guide, evidence register, migration dependency graph, and SHA-256 package manifest.
+- Adds LATEST/ shortcuts to current master and core handoff documents.
+- The SQL inventory is read-only; bucket details are an optional separate query only if storage.buckets exists.
+- No database migrations were executed. No live system was changed.

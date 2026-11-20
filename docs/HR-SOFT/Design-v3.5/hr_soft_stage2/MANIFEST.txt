@@ -1,0 +1,15 @@
+HR-SOFT — Stage 2 Design Package v1.9
+Date: 2026-11-18
+Status: DESIGN ONLY — no Supabase/database changes were executed.
+
+Files:
+1. HR_SOFT_Master_v1.9.md
+2. HR_SOFT_Postgres_Baseline_v0.1.sql
+3. HR_SOFT_Workflow_Files_Sensitive_v0.1.sql
+4. README.txt
+
+Important:
+- Baseline SQL is a draft for review, not an approved production migration.
+- Supplemental SQL depends on the baseline.
+- RLS and Storage policies are not yet included; they require a dedicated security design and tests.
+- No Supabase project was selected or modified.

@@ -8,6 +8,14 @@ Thumbs.db
 *.swp
 *.swo
 
+# Local secrets / configuration
+.env
+.env.*
+!.env.example
+supabase-config.js
+supabase/.temp/
+supabase/.branches/
+
 # Local data / exports
 *.xlsx
 *.xls
@@ -15,7 +23,11 @@ Thumbs.db
 org-structure-*.json
 sample_*.json
 
-# Dependencies (if added later)
+# Dependencies / Python
 node_modules/
 .venv/
 __pycache__/
+*.pyc
+
+# Local one-time credentials; never commit
+.local-secrets/
