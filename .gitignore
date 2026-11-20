@@ -14,6 +14,7 @@ Thumbs.db
 !.env.example
 supabase-config.js
 supabase/.temp/
+supabase/.branches/
 
 # Local data / exports
 *.xlsx

@@ -14,6 +14,7 @@
     button.secondary{background:#e2e8f0;color:#1e293b}button:disabled{opacity:.55;cursor:wait}
     #status{margin-top:18px;padding:12px;border-radius:9px;background:#f1f5f9;color:#334155;font-size:13px;line-height:1.9;white-space:pre-wrap}
     .small{font-size:12px;color:#64748b;margin-top:16px}a{color:#166534}
+    #org-readonly-link[hidden]{display:none!important}
   </style>
 </head>
 <body>
@@ -44,8 +45,9 @@
   </form>
 
   <button id="logout-btn" class="secondary" type="button" hidden>خروج از حساب</button>
+  <a id="org-readonly-link" href="./org-structure-readonly.html" hidden style="display:block;margin-top:12px;text-align:center;padding:10px;border:1px solid #bbf7d0;border-radius:9px;background:#f0fdf4;color:#166534;font-size:13px;font-weight:600">مشاهده ساختار سازمانی از پایگاه داده (فقط‌خواندنی)</a>
   <div id="status" role="status" aria-live="polite">در انتظار اتصال به Supabase…</div>
-  <div class="small">این صفحه فقط ورود و وضعیت حساب را آزمایش می‌کند؛ API داده‌های سازمانی هنوز به رابط متصل نشده است.</div>
+  <div class="small">نمایش ساختار سازمانی به‌صورت فقط‌خواندنی از پایگاه داده در دسترس است؛ عملیات ایجاد، ویرایش و حذف هنوز فعال نشده‌اند.</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script>
 <script src="./supabase-config.js"></script>
@@ -54,6 +56,7 @@
   const statusEl = document.getElementById('status');
   const loginBtn = document.getElementById('login-btn');
   const logoutBtn = document.getElementById('logout-btn');
+  const orgReadonlyLink = document.getElementById('org-readonly-link');
   const signupBtn = document.getElementById('signup-btn');
   const loginForm = document.getElementById('login-form');
   const bootstrapForm = document.getElementById('bootstrap-form');
@@ -68,6 +71,7 @@
   async function refreshStatus() {
     const { data: { session } } = await client.auth.getSession();
     logoutBtn.hidden = !session;
+    orgReadonlyLink.hidden = true;
     loginForm.hidden = !!session;
     signupBtn.hidden = !!session;
     bootstrapForm.hidden = !session;
@@ -77,7 +81,8 @@
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.is_provisioned) {
       bootstrapForm.hidden = true;
-      statusEl.textContent = 'حساب ورود فعال است و به حساب داخلی HR-SOFT متصل شده است. دسترسی داده‌ای تا تکمیل API و مجوزها همچنان محدود است.';
+      orgReadonlyLink.hidden = false;
+      statusEl.textContent = 'حساب ورود فعال است و به حساب داخلی HR-SOFT متصل شده است. دسترسی داده‌ای تابع مجوزهای حساب است.';
     } else {
       bootstrapForm.hidden = false;
       statusEl.textContent = 'احراز هویت موفق است؛ اما این حساب هنوز به Tenant و حساب داخلی HR-SOFT متصل نشده است. هیچ داده سازمانی در دسترس نیست.';

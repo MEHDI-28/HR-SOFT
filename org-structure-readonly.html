@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ساختار سازمانی | HR-SOFT</title>
+  <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.003/Vazirmatn-font-face.css" rel="stylesheet" />
+  <style>
+    :root{font-family:Vazirmatn,system-ui,sans-serif;color:#17212b;background:#f4f7f9}
+    *{box-sizing:border-box}body{margin:0}button,select{font:inherit}
+    .shell{max-width:1180px;margin:auto;padding:28px 18px 60px}
+    header{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:22px}
+    h1{font-size:25px;margin:0 0 5px}.muted{color:#64748b;font-size:13px;line-height:1.8}
+    .panel{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 2px 8px #0f172a08}
+    .toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+    label{display:block;font-size:12px;color:#475569;margin-bottom:6px}
+    select,button{border:1px solid #cbd5e1;border-radius:9px;padding:9px 12px;background:#fff;color:#17212b}
+    button{cursor:pointer}button.primary{background:#14532d;border-color:#14532d;color:#fff}
+    button:disabled,select:disabled{opacity:.55;cursor:not-allowed}
+    #status{padding:12px 14px;border-radius:10px;background:#eff6ff;color:#1e40af;font-size:13px;line-height:1.9;white-space:pre-wrap}
+    #status.error{background:#fef2f2;color:#991b1b}#status.success{background:#f0fdf4;color:#166534}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+    .stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px}
+    .stat strong{display:block;font-size:22px;color:#0f172a}.stat span{font-size:12px;color:#64748b}
+    .tree{display:grid;gap:10px}.unit{border:1px solid #dbe4ec;border-radius:12px;background:#fff;overflow:hidden}
+    .unit-head{padding:12px 14px;background:#f8fafc;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .unit-title{font-weight:700}.tag{font-size:11px;padding:3px 8px;border-radius:20px;background:#e2e8f0;color:#334155}
+    .unit-body{padding:10px 14px 14px 24px}.children{margin:10px 0 0 18px;padding-right:14px;border-right:2px solid #dbeafe;display:grid;gap:9px}
+    .positions{display:grid;gap:7px;margin-top:8px}.position{padding:9px 11px;border:1px solid #e2e8f0;border-radius:9px;background:#fff}
+    .position strong{font-size:13px}.position small{display:block;color:#64748b;font-size:11px;margin-top:3px}
+    .empty{padding:26px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px}
+    .rel-list{display:grid;gap:7px}.rel{padding:9px 11px;border:1px solid #e2e8f0;border-radius:9px;font-size:12px}
+    .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    a{color:#166534;text-decoration:none;font-size:13px}a:hover{text-decoration:underline}
+    .foot{font-size:11px;color:#64748b;margin-top:20px;line-height:1.9}
+    @media(max-width:600px){.shell{padding:18px 12px 40px}h1{font-size:21px}.panel{padding:13px}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header>
+    <div>
+      <h1>ساختار سازمانی</h1>
+      <div class="muted">نمایش اطلاعات ساختار از پایگاه داده HR-SOFT — نسخه فقط‌خواندنی</div>
+    </div>
+    <div class="actions">
+      <a href="./index.html">بازگشت به صفحه اصلی</a>
+      <button id="logout" type="button">خروج از حساب</button>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="toolbar">
+      <div style="min-width:240px;flex:1">
+        <label for="company">شرکت</label>
+        <select id="company" style="width:100%" disabled><option>در حال دریافت شرکت‌های مجاز…</option></select>
+      </div>
+      <button id="refresh" class="primary" type="button" disabled>دریافت آخرین اطلاعات</button>
+    </div>
+    <p id="identity" class="muted" style="margin:12px 0 0">در حال بررسی نشست ورود…</p>
+  </section>
+
+  <section class="panel">
+    <div id="status" role="status" aria-live="polite">در حال اتصال امن به Supabase…</div>
+  </section>
+
+  <section id="snapshot" hidden>
+    <div class="panel">
+      <h2 style="font-size:16px;margin:0 0 12px">خلاصه ساختار</h2>
+      <div id="stats" class="stats"></div>
+      <p id="effective" class="muted" style="margin:10px 0 0"></p>
+    </div>
+    <div class="panel">
+      <h2 style="font-size:16px;margin:0 0 12px">چارت واحدهای سازمانی و سمت‌ها</h2>
+      <div id="tree" class="tree"></div>
+    </div>
+    <div class="panel" id="relations-panel" hidden>
+      <h2 style="font-size:16px;margin:0 0 12px">روابط بین سمت‌ها</h2>
+      <div id="relations" class="rel-list"></div>
+    </div>
+  </section>
+
+  <p class="foot">این صفحه فقط از دو RPC مجاز Supabase برای دریافت context و snapshot استفاده می‌کند. هیچ عملیات ایجاد، ویرایش، حذف، ورود فایل یا ذخیره‌سازی در مرورگر در این صفحه وجود ندارد. نمایش هر رکورد تابع مجوزهای حساب واردشده است.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.1"></script>
+<script src="./supabase-config.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $('status');
+  const companySelect = $('company');
+  const refreshBtn = $('refresh');
+  const logoutBtn = $('logout');
+  const snapshotSection = $('snapshot');
+  let client = null;
+  let context = null;
+  let activeSnapshot = null;
+  let requestSeq = 0;
+
+  function setStatus(message, kind='info') {
+    statusEl.textContent = message;
+    statusEl.className = kind;
+  }
+  function safeText(value, fallback='—') {
+    return value === null || value === undefined || value === '' ? fallback : String(value);
+  }
+  function addStat(container, value, label) {
+    const card = document.createElement('div');
+    card.className = 'stat';
+    const strong = document.createElement('strong');
+    strong.textContent = String(value);
+    const span = document.createElement('span');
+    span.textContent = label;
+    card.append(strong, span);
+    container.appendChild(card);
+  }
+  function makeTag(text) {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = text;
+    return tag;
+  }
+  function makePositionCard(position, positionById) {
+    const card = document.createElement('div');
+    card.className = 'position';
+    const title = document.createElement('strong');
+    title.textContent = safeText(position.title);
+    const meta = document.createElement('small');
+    const parent = position.superior_position_id ? positionById.get(position.superior_position_id) : null;
+    const pieces = ['کد سمت: ' + safeText(position.position_code)];
+    if (parent) pieces.push('سمت بالاتر: ' + safeText(parent.title));
+    if (position.approved_capacity !== null && position.approved_capacity !== undefined) pieces.push('ظرفیت مصوب: ' + position.approved_capacity);
+    if (position.valid_from) pieces.push('از ' + position.valid_from);
+    if (position.valid_to) pieces.push('تا ' + position.valid_to);
+    meta.textContent = pieces.join(' · ');
+    card.append(title, meta);
+    return card;
+  }
+  function renderSnapshot(data) {
+    activeSnapshot = data;
+    snapshotSection.hidden = false;
+    const stats = $('stats');
+    stats.replaceChildren();
+    addStat(stats, (data.org_layers || []).length, 'لایه سازمانی');
+    addStat(stats, (data.org_units || []).length, 'واحد قابل مشاهده');
+    addStat(stats, (data.positions || []).length, 'سمت قابل مشاهده');
+    addStat(stats, (data.organizational_positions || []).length, 'عنوان سازمانی');
+    addStat(stats, (data.relationships || []).length, 'رابطه قابل مشاهده');
+    $('effective').textContent = 'شرکت: ' + safeText(data.company?.display_name || data.company?.legal_name) + ' · تاریخ مؤثر: ' + safeText(data.effective_date);
+
+    const tree = $('tree');
+    tree.replaceChildren();
+    const units = Array.isArray(data.org_units) ? data.org_units : [];
+    const positions = Array.isArray(data.positions) ? data.positions : [];
+    const positionById = new Map(positions.map(p => [p.id, p]));
+    const positionsByUnit = new Map();
+    positions.forEach(p => {
+      if (!positionsByUnit.has(p.org_unit_id)) positionsByUnit.set(p.org_unit_id, []);
+      positionsByUnit.get(p.org_unit_id).push(p);
+    });
+    const unitById = new Map(units.map(u => [u.id, u]));
+    const children = new Map();
+    units.forEach(u => {
+      const parentId = u.parent_unit_id && unitById.has(u.parent_unit_id) ? u.parent_unit_id : null;
+      const key = parentId || '__root__';
+      if (!children.has(key)) children.set(key, []);
+      children.get(key).push(u);
+    });
+    const renderUnit = (unit, depth, path) => {
+      if (path.has(unit.id)) return null;
+      const nextPath = new Set(path);
+      nextPath.add(unit.id);
+      const article = document.createElement('article');
+      article.className = 'unit';
+      const head = document.createElement('div');
+      head.className = 'unit-head';
+      const name = document.createElement('span');
+      name.className = 'unit-title';
+      name.textContent = safeText(unit.title);
+      head.append(name, makeTag('کد واحد: ' + safeText(unit.unit_code)));
+      if (unit.unit_type_code) head.append(makeTag('نوع: ' + unit.unit_type_code));
+      if (unit.layer_id) {
+        const layer = (data.org_layers || []).find(x => x.id === unit.layer_id);
+        if (layer) head.append(makeTag('لایه: ' + layer.title));
+      }
+      article.appendChild(head);
+      const body = document.createElement('div');
+      body.className = 'unit-body';
+      const unitPositions = positionsByUnit.get(unit.id) || [];
+      if (unitPositions.length) {
+        const list = document.createElement('div');
+        list.className = 'positions';
+        unitPositions.forEach(p => list.appendChild(makePositionCard(p, positionById)));
+        body.appendChild(list);
+      } else {
+        const note = document.createElement('div');
+        note.className = 'muted';
+        note.textContent = 'سمت قابل نمایشی در این واحد ثبت نشده است.';
+        body.appendChild(note);
+      }
+      const kids = children.get(unit.id) || [];
+      if (kids.length) {
+        const nested = document.createElement('div');
+        nested.className = 'children';
+        kids.forEach(child => {
+          const rendered = renderUnit(child, depth + 1, nextPath);
+          if (rendered) nested.appendChild(rendered);
+        });
+        body.appendChild(nested);
+      }
+      article.appendChild(body);
+      return article;
+    };
+    const roots = children.get('__root__') || [];
+    roots.forEach(unit => {
+      const rendered = renderUnit(unit, 0, new Set());
+      if (rendered) tree.appendChild(rendered);
+    });
+    if (!units.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'برای این شرکت هنوز واحد سازمانی قابل نمایشی در پایگاه داده ثبت نشده است.';
+      tree.appendChild(empty);
+    } else if (!roots.length) {
+      const note = document.createElement('div');
+      note.className = 'empty';
+      note.textContent = 'واحدهای قابل مشاهده دریافت شدند، اما ریشه قابل نمایش پیدا نشد. برای جلوگیری از حلقه یا ساختار ناقص، نمایش درخت متوقف شد.';
+      tree.appendChild(note);
+    }
+
+    const rels = Array.isArray(data.relationships) ? data.relationships : [];
+    $('relations-panel').hidden = !rels.length;
+    const relContainer = $('relations');
+    relContainer.replaceChildren();
+    rels.forEach(rel => {
+      const item = document.createElement('div');
+      item.className = 'rel';
+      const from = positionById.get(rel.from_position_id);
+      const to = positionById.get(rel.to_position_id);
+      item.textContent = safeText(from?.title, 'سمت قابل مشاهده') + ' ← ' + safeText(rel.relationship_type) + ' → ' + safeText(to?.title, 'سمت قابل مشاهده') + (rel.description ? ' · ' + rel.description : '');
+      relContainer.appendChild(item);
+    });
+  }
+
+  async function loadSnapshot() {
+    const companyId = companySelect.value;
+    if (!companyId) { setStatus('هیچ شرکتی برای نمایش در دسترس نیست.', 'error'); snapshotSection.hidden = true; return; }
+    const sequence = ++requestSeq;
+    refreshBtn.disabled = true;
+    setStatus('در حال دریافت snapshot مجاز شرکت…');
+    const { data, error } = await client.rpc('hr_org_get_admin_snapshot_v1', { p_company_id: companyId });
+    if (sequence !== requestSeq) return;
+    refreshBtn.disabled = false;
+    if (error) {
+      snapshotSection.hidden = true;
+      const message = error.message || 'خطای نامشخص';
+      setStatus('دریافت ساختار انجام نشد: ' + message, 'error');
+      return;
+    }
+    if (!data || typeof data !== 'object' || data.contract_version !== 1) {
+      snapshotSection.hidden = true;
+      setStatus('ساختار پاسخ API با قرارداد نسخه ۱ مطابقت ندارد؛ نمایش متوقف شد.', 'error');
+      return;
+    }
+    if (!data.capabilities?.chart) {
+      snapshotSection.hidden = true;
+      setStatus('مجوز مشاهده چارت سازمانی برای این شرکت در نشست فعلی تأیید نشد.', 'error');
+      return;
+    }
+    renderSnapshot(data);
+    setStatus('اطلاعات ساختار با موفقیت از پایگاه داده دریافت شد. این صفحه فقط‌خواندنی است.', 'success');
+  }
+
+  async function initialize() {
+    const cfg = window.HR_SUPABASE_CONFIG;
+    if (!window.supabase || !cfg?.url || !cfg?.publishableKey || cfg.publishableKey.includes('REPLACE')) {
+      setStatus('تنظیمات Supabase کامل نیست. فایل supabase-config.js را بررسی کنید.', 'error');
+      refreshBtn.disabled = true;
+      return;
+    }
+    client = window.supabase.createClient(cfg.url, cfg.publishableKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    const { data: { session }, error: sessionError } = await client.auth.getSession();
+    if (sessionError || !session) {
+      setStatus('نشست ورود معتبر پیدا نشد. ابتدا وارد سامانه شوید.', 'error');
+      window.location.replace('./auth.html');
+      return;
+    }
+    logoutBtn.hidden = false;
+    const { data, error } = await client.rpc('hr_admin_get_context_v1');
+    if (error) {
+      setStatus('دریافت context حساب انجام نشد: ' + (error.message || 'خطای نامشخص'), 'error');
+      return;
+    }
+    if (!data || typeof data !== 'object' || data.contract_version !== 1) {
+      setStatus('ساختار context دریافتی با قرارداد نسخه ۱ مطابقت ندارد.', 'error');
+      return;
+    }
+    context = data;
+    $('identity').textContent = 'سازمان: ' + safeText(context.tenant?.display_name);
+    const companies = (Array.isArray(context.companies) ? context.companies : [])
+      .filter(company => company.capabilities?.chart === true);
+    companySelect.replaceChildren();
+    companies.forEach(company => {
+      const option = document.createElement('option');
+      option.value = company.id;
+      option.textContent = safeText(company.display_name || company.legal_name) + ' (' + safeText(company.company_code) + ')';
+      companySelect.appendChild(option);
+    });
+    companySelect.disabled = companies.length === 0;
+    refreshBtn.disabled = companies.length === 0;
+    if (!companies.length) {
+      setStatus('حساب واردشده معتبر است، اما شرکتی با مجوز مشاهده چارت سازمانی برای این حساب برنگردانده شد.', 'error');
+      snapshotSection.hidden = true;
+      return;
+    }
+    await loadSnapshot();
+  }
+
+  companySelect.addEventListener('change', loadSnapshot);
+  refreshBtn.addEventListener('click', loadSnapshot);
+  logoutBtn.addEventListener('click', async () => {
+    if (!client) return;
+    logoutBtn.disabled = true;
+    const { error } = await client.auth.signOut();
+    if (error) setStatus('خروج انجام نشد: ' + error.message, 'error');
+    else window.location.replace('./auth.html');
+    logoutBtn.disabled = false;
+  });
+  initialize().catch(error => setStatus('خطای غیرمنتظره در راه‌اندازی صفحه: ' + (error?.message || String(error)), 'error'));
+})();
+</script>
+</body>
+</html>
